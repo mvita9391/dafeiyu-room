@@ -25,9 +25,7 @@ npm run dev
 
 ### Electron 桌面版
 
-Electron 桌面壳单独维护。公开仓库不含 `desktop/`，所以刚克隆时请用上面的浏览器启动方式。
-
-如果项目根目录已有 `desktop/main.cjs`，在两个终端里执行：
+桌面壳源码随仓库提供。执行过 `npm ci` 后，从项目根目录开两个终端：
 
 ```bash
 # 终端 1，启动本地游戏服务
@@ -37,7 +35,7 @@ npm run dev
 npm run desktop:dev
 ```
 
-两个命令都从项目根目录执行。游戏服务已经在运行时，直接执行 `npm run desktop:dev` 即可。
+游戏服务已经在运行时，直接执行 `npm run desktop:dev` 即可。打包和存档位置见[桌面版说明](docs/DESKTOP.md)。
 
 ## 在小世界里能做什么
 
@@ -79,6 +77,7 @@ npm run desktop:dev
 
 - `npm run build` 后执行 `npm start`，可以运行生产构建。
 - `npm run check` 运行测试、构建和公开资源检查。
+- [Three.js 开发 Skills](docs/THREEJS-SKILLS.md)列出游戏开发用的 9 个 skill 和安装方法。
 - [文档目录](docs/README.md)收录开发、验收和兼容说明。
 
 项目代码和作者有权授权的资源采用 [MIT License](LICENSE)。Polyfork 精选模型按 CC BY 4.0 分发，逐项署名见 [Polyfork 署名](resources/polyfork/CREDITS.md)。其他素材和依赖的来源见 [第三方声明](THIRD-PARTY-NOTICES.md)。

@@ -12,6 +12,8 @@
 | 导入和管理本地素材 | [可选本地素材包](LOCAL-ASSETS.md) |
 | 了解默认关闭的直接动作与施法接口 | [MCP 高级动作接口](MCP-ADVANCED-ACTIONS.md) |
 | 提交前核对素材、存档和公开产物 | [提交与发布检查](RELEASING.md) |
+| 启动和打包 Electron 桌面版 | [桌面版说明](DESKTOP.md) |
+| 安装游戏开发用的 Three.js Skills | [Three.js 开发 Skills](THREEJS-SKILLS.md) |
 | 本地验收与开发检查 | [验收清单](SELF-TEST.md) |
 
 ## 系统分工

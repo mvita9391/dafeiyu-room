@@ -9,11 +9,18 @@ const approved=new Map([...manifest.files,...audioManifest.files.map(f=>({...f,r
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
+const desktopSources=new Set([
+ 'desktop/.gitignore','desktop/README.md','desktop/docs/DESKTOP.md',
+ 'desktop/electron-builder.yml','desktop/launch.mjs','desktop/main.cjs','desktop/package.json',
+ 'desktop/paths.cjs','desktop/preload.cjs','desktop/probe.cjs','desktop/scripts/package.mjs',
+ 'desktop/test/desktop-paths.test.mjs',
+]);
 export function blockedPublicFile(file){
  const p=file.replaceAll('\\','/');
  if(approved.has(p))return false;
  if(p.startsWith('resources/polyfork/'))return !polyforkFiles.has(p);
- if(p==='.npmrc'||p.startsWith('desktop/'))return true;
+ if(p==='.npmrc')return true;
+ if(p.startsWith('desktop/'))return !desktopSources.has(p);
  if(p.startsWith('resources/character/')&&p!=='resources/character/manifest.json')return true;
  return /\.(unitypackage|fbx|prefab|unity|glb|gltf|blend\d*|pem|key|p12|pfx|sqlite(?:-wal|-shm)?|db(?:-wal|-shm)?|bin|gguf|onnx|safetensors|pt|pth|wav|mp3|ogg|webm|m4a|woff2?|ttf|otf)$/i.test(p)
   || /(^|\/)(data|模型|assets|shots|qa|scratch|temp|tmp|\.superpowers|\.cache|\.town-import-jobs|voices|models|recordings)(\/|$)/i.test(p)
@@ -39,7 +46,7 @@ export function checkPublic(){
  const staged=execFileSync('git',['diff','--cached','--name-only','--diff-filter=ACMR','-z']).toString().split('\0').filter(Boolean);
  const bad=[...new Set([...candidates,...staged])].filter(blockedPublicFile);
  if(bad.length)throw Error('Private/scratch files eligible for commit: '+bad.join(', '));
- for(const file of [...approved.keys(),...polyforkFiles,'docs/MCP-ADVANCED-ACTIONS.md','public/licenses/elemental-sandbox.txt','public/licenses/webgl-noise.txt']){
+ for(const file of [...approved.keys(),...polyforkFiles,...desktopSources,'docs/DESKTOP.md','docs/THREEJS-SKILLS.md','docs/MCP-ADVANCED-ACTIONS.md','public/licenses/elemental-sandbox.txt','public/licenses/webgl-noise.txt']){
   if(!candidates.has(file)||!fs.statSync(file,{throwIfNoEntry:false})?.isFile()||fs.lstatSync(file).isSymbolicLink())throw Error('Missing public file: '+file);
  }
  for(const file of walk('dist')){

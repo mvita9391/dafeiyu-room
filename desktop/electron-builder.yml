@@ -1,0 +1,40 @@
+appId: com.dafeiyu.game
+productName: 大肥鱼
+copyright: "个人使用"
+directories:
+  output: desktop/release
+  buildResources: desktop/build
+asar: false
+files:
+  - dist/**
+  - server/**
+  - resources/polyfork/**
+  - shared/**
+  - desktop/**
+  - package.json
+  - "!desktop/node_modules/**"
+  - "!desktop/release/**"
+  - "!desktop/docs/**"
+  - "!desktop/test/**"
+  - "!desktop/scripts/**"
+  - "!**/*.map"
+  - "!**/*.d.ts"
+extraMetadata:
+  main: desktop/main.cjs
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games
+  identity: null
+win:
+  target:
+    - nsis
+    - portable
+  artifactName: ${productName}-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+portable:
+  artifactName: ${productName}-portable-${version}-${arch}.${ext}

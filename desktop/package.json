@@ -1,0 +1,20 @@
+{
+  "name": "dafeiyu-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "大肥鱼 Electron 桌面客户端",
+  "main": "main.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node launch.mjs .",
+    "probe": "node launch.mjs probe.cjs",
+    "test": "node --test test/*.test.mjs",
+    "pack": "node scripts/package.mjs --dir",
+    "dist:mac": "node scripts/package.mjs --mac",
+    "dist:win": "node scripts/package.mjs --win"
+  },
+  "devDependencies": {
+    "electron": "^40.10.3",
+    "electron-builder": "^26.18.0"
+  }
+}

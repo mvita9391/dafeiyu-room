@@ -32,6 +32,8 @@ docs/*
 !docs/LOCAL-ASSETS.md
 !docs/MCP-ADVANCED-ACTIONS.md
 !docs/RELEASING.md
+!docs/DESKTOP.md
+!docs/THREEJS-SKILLS.md
 !docs/screenshots/
 
 # Local database and personal saves
@@ -48,7 +50,8 @@ data/
 
 # Desktop client build output (electron-builder)
 release/
-/desktop/
+/desktop/out/
+/desktop/settings.json
 .electron-builder-cache/
 .electron-cache/
 .build-home/
