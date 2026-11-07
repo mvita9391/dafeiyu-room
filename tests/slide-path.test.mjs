@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {slidePoint} from '../shared/world/slide-path.js';
+test('slide follows ladder and actual left-side chute under rotation and scale',()=>{const e={position:[0,0,0],rotation:0,scale:[1,1,1]};assert.deepEqual(slidePoint(e,0),[-4.16,.04,0]);assert.deepEqual(slidePoint(e,.6),[-2.96,1.44,0]);assert.ok(slidePoint(e,1)[0]>-1.01);const rotated=slidePoint({...e,position:[5,0,4],rotation:Math.PI/2,scale:[2,2,2]},.6);assert.ok(Math.abs(rotated[0]-5)<1e-8);assert.ok(Math.abs(rotated[2]-9.92)<1e-8);});

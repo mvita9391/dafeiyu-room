@@ -1,0 +1,92 @@
+node_modules
+dist/
+.DS_Store
+.env*
+character.local.json
+模型
+*.glb
+*.gltf
+*.blend*
+shots/
+qa/
+.cache/
+.godot/
+.godot_download/
+.recovered/
+_archive/
+assets/
+tools/
+model-preview.html
+README.private.md
+大肥鱼房间.html
+src/characters/whaleGirl.js
+# Publish curated guides only; local research/process notes stay private.
+docs/*
+!docs/README.md
+!docs/PITFALLS.md
+!docs/MCP-QUICKSTART.md
+!docs/MCP-PROMPTS.md
+!docs/MCP-COMPATIBILITY.md
+!docs/WORLD-SAVES.md
+!docs/SELF-TEST.md
+!docs/LOCAL-ASSETS.md
+!docs/MCP-ADVANCED-ACTIONS.md
+!docs/RELEASING.md
+!docs/screenshots/
+
+# Local database and personal saves
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+# Local implementation reports and scratch artifacts
+.superpowers/
+# Locally installed agent skills (tooling, not part of the game)
+.dsh/
+
+# Desktop client build output (electron-builder)
+release/
+/desktop/
+.electron-builder-cache/
+.electron-cache/
+.build-home/
+# Skill evidence + captures (local, regenerated per pass)
+artifacts/
+# Third-party asset downloads (local, not shipped)
+downloads/
+
+# Approved redistributable character assets; inventory checked by check:public
+/resources/character/models/*
+/resources/character/characters/
+/resources/character/notes/
+!/resources/character/models/Dafeiyu.glb
+!resources/polyfork/glb/*.glb
+# User-supplied Unity packages and derived local content never ship.
+*.unitypackage
+*.fbx
+*.prefab
+*.unity
+*.local-layout.json
+
+# Optional local pack jobs, including uploads and rollback copies
+.town-import-jobs/
+
+# npm 缓存（外置盘内，避免 ~/.npm 权限问题）
+.npm-cache/
+
+# Local npm settings and author reference images
+/.npmrc
+/大肥鱼正面
+/大肥鱼正面.png
+/大肥鱼侧面.png
+/大肥鱼背面.png
+/鲸娘女仆三视图设定稿.png
+/鲸娘角色3D建模设定图.png
+
+# Credentials, including vault keys outside the default data directory
+*.key
+*.pem
+*.p12
+*.pfx

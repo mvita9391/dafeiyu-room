@@ -1,0 +1,37 @@
+import {test} from 'node:test';import {existsSync} from 'node:fs';import assert from 'node:assert/strict';import {createServer} from 'vite';import {chromium} from 'playwright';
+const executable=process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||(['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',chromium.executablePath()].find(existsSync));
+test('minimizing placement saves the draft and a rejected draft can be retried',{skip:!executable&&'Install Playwright Chromium to run browser UI regression'},async()=>{const html=`<html><body><canvas></canvas><script type="module">
+import * as THREE from '/node_modules/three/build/three.module.js';import {RoomEditor} from '/src/ui/room-editor.js';import {SceneRegistry} from '/src/world/registry.js';import {createFurniture} from '/src/world/props.js';
+const snapshot={worldId:'default',layoutRevision:0,scenes:[{sceneId:'room',templateId:'cozy_room_v1',name:'房间'}],entities:[],actors:[],portals:[]};let attempts=0;
+const client={snapshot,async refresh(){return this.snapshot;},async dispatch(command){if(command.kind==='build.preview'){attempts++;if(attempts===1)throw Error('DESTINATION_BLOCKED');return {planId:'p'};}if(command.kind==='build.apply'){const op=editor.sync.pending.ops[0];snapshot.entities=[{entityId:'real-chair',sceneId:'room',type:op.type,position:op.position,rotation:op.rotation,scale:op.scale}];snapshot.layoutRevision++;return {changeId:'change',createdIds:{[op.ref]:'real-chair'}};}return {};}};
+const scene=new THREE.Scene(),registry=new SceneRegistry({scene,createFurniture});registry.applySnapshot(snapshot);const editor=new RoomEditor({group:registry.contexts.room.group,scene,camera:new THREE.PerspectiveCamera(),canvas:document.querySelector('canvas'),contexts:registry.contexts,worldClient:client,registry});editor.active=true;editor.add('chair');window.fixture={editor,client,get attempts(){return attempts;}};window.ready=true;
+</script></body></html>`;const vite=await createServer({configFile:false,optimizeDeps:{noDiscovery:true,entries:[]},server:{host:'127.0.0.1',port:0},plugins:[{name:'fixture',configureServer(server){server.middlewares.use('/fixture.html',(_req,res)=>{res.setHeader('content-type','text/html');res.end(html);});}}]});let browser;try{await vite.listen();browser=await chromium.launch({headless:true,executablePath:executable});const page=await browser.newPage();await page.goto(`http://127.0.0.1:${vite.httpServer.address().port}/fixture.html`);await page.waitForFunction(()=>window.ready);const panel=page.locator('#room-edit-panel');
+const minimize=panel.getByRole('button',{name:'保存并收起家具栏'});
+assert.equal(await minimize.isVisible(),true);
+assert.equal(await panel.locator('.room-edit-catalog').isVisible(),false);
+assert.equal(await page.getByRole('button',{name:/取消新增|保存摆放/}).count(),0);
+await minimize.click();
+assert.equal(await panel.isVisible(),false);
+const retry=page.getByRole('button',{name:'重试保存'});
+await retry.waitFor({state:'visible'});await retry.click();await page.waitForFunction(()=>window.fixture.client.snapshot.entities.length===1);assert.equal(await page.evaluate(()=>window.fixture.attempts),2);assert.equal(await retry.isVisible(),false);assert.equal(await page.evaluate(()=>window.fixture.editor.snapshot()[0].entityId),'real-chair');await page.evaluate(async()=>{window.fixture.editor.save();await window.fixture.editor.sync.flush();});assert.equal(await page.evaluate(()=>window.fixture.attempts),2);
+await page.getByRole('button',{name:'展开家具栏'}).click();
+assert.equal(await panel.locator('.room-edit-catalog').isVisible(),true);
+assert.equal(await minimize.isVisible(),true);
+await page.evaluate(()=>{
+ const {editor}=window.fixture;
+ editor.pick=()=>editor.group.children[0];
+ window.orbitDeltas=[];
+ editor.onOrbit=(dx,dy)=>window.orbitDeltas.push([dx,dy]);
+});
+await page.mouse.click(36,40,{button:'right'});
+const menu=page.locator('.room-edit-menu');
+assert.equal(await menu.isVisible(),true);
+await page.mouse.move(36,40);
+await page.mouse.down({button:'right'});
+await page.mouse.move(108,62,{steps:4});
+assert.equal(await page.locator('canvas').evaluate(c=>c.style.cursor),'none');
+await page.mouse.up({button:'right'});
+assert.equal(await menu.isVisible(),false);
+assert.equal(await page.locator('canvas').evaluate(c=>c.style.cursor),'grab');
+assert.deepEqual(await page.evaluate(()=>window.orbitDeltas.reduce(([x,y],[dx,dy])=>[x+dx,y+dy],[0,0])),[72,22]);
+}finally{await browser?.close();await vite.close();}});

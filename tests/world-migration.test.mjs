@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {migrateWorld} from '../server/storage/migrations.js';
+import {defaultManifest} from '../shared/world/default-manifest.js';
+const chair={type:'chair',position:[.123,0,1],rotation:.7,scale:[1,2,1]};
+test('legacy import preserves transforms, aliases, stable identities and nine protected plots',()=>{
+ const db=new DatabaseSync(':memory:');db.exec('CREATE TABLE layouts(id TEXT PRIMARY KEY,layout TEXT,revision INTEGER,updated_at TEXT)');db.prepare('INSERT INTO layouts VALUES(?,?,?,?)').run('room',JSON.stringify([chair,chair]),7,'old');
+ migrateWorld(db,{defaultManifest});const first=db.prepare('SELECT snapshot FROM worlds').get().snapshot;const s=JSON.parse(first);assert.equal(s.entities.filter(e=>e.sceneId==='bedroom').length,2);assert.equal(new Set(s.entities.map(e=>e.entityId)).size,s.entities.length);assert.deepEqual(s.entities[0].position,chair.position);assert.equal(s.entities.find(e=>e.type==='yardFarm').plots.length,9);assert.equal(s.entities.find(e=>e.type==='yardFarm').protected,true);migrateWorld(db,{defaultManifest});assert.equal(db.prepare('SELECT snapshot FROM worlds').get().snapshot,first);db.close();
+});
+test('failed import rolls back schema and preserves legacy data for retry',()=>{const db=new DatabaseSync(':memory:');db.exec("CREATE TABLE layouts(id TEXT PRIMARY KEY,layout TEXT,revision INTEGER,updated_at TEXT); INSERT INTO layouts VALUES('room','broken',1,'old')");assert.throws(()=>migrateWorld(db,{defaultManifest}));assert.equal(db.prepare('SELECT layout FROM layouts').get().layout,'broken');assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='worlds'").get().n,0);db.close();});
+test('temporary database reopens with identical snapshot and migration retry is inert',async()=>{const {mkdtempSync,rmSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');const dir=mkdtempSync(join(tmpdir(),'world-migrate-'));try{let db=new DatabaseSync(join(dir,'test.sqlite'));migrateWorld(db,{defaultManifest});const before=db.prepare('SELECT snapshot FROM worlds').get().snapshot;db.close();db=new DatabaseSync(join(dir,'test.sqlite'));assert.equal(migrateWorld(db,{defaultManifest}).imported,false);assert.equal(db.prepare('SELECT snapshot FROM worlds').get().snapshot,before);db.close();}finally{rmSync(dir,{recursive:true,force:true});}});

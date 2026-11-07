@@ -1,0 +1,116 @@
+{
+  "files": [
+    {
+      "path": "resources/audio/feed.mp3",
+      "sha256": "772908fd41059844b67e69020de6e34ff6f2d7043af60d91f033545b4e2afe6d"
+    },
+    {
+      "path": "resources/audio/friends.mp3",
+      "sha256": "5272920cd5838bbb1a51c226162ee0b421e4b13997ec8cb8056cbc5ccd916365"
+    },
+    {
+      "path": "resources/audio/garden-theme.mp3",
+      "sha256": "88cb510a87d815422941a944a945c4f1d56529f7535a773de7041e06bc45a6c4"
+    },
+    {
+      "path": "resources/audio/opening.mp3",
+      "sha256": "e8241350c6acf7db4e950d815c19350ad8d79f52deed707c9f3f4e11d929b2b9"
+    },
+    {
+      "path": "resources/audio/pet.mp3",
+      "sha256": "26060b5d97602fa5110dc7f9064e572ca5739017282352c6c595e3f9e84f8383"
+    },
+    {
+      "path": "resources/audio/pool.mp3",
+      "sha256": "21d71e9d4ab45dd1fb352212131bd7bcf60f7b0f781fb733992f939da49a7c5e"
+    },
+    {
+      "path": "resources/audio/sleep.mp3",
+      "sha256": "96f296d8961dade3d0f34549e7f9ecdc8facb5f57a7456aeeb31726ebf79bc7f"
+    },
+    {
+      "path": "resources/audio/action-crawl-cloth.wav",
+      "sha256": "59ed54bc80d2f9743a9b3769f84503a7ea88fb2aac6d3b6d4516ed9b3b39519a"
+    },
+    {
+      "path": "resources/audio/action-kick-whoosh.wav",
+      "sha256": "cf363333bcd7f16f81b89f920886ad532f4f70bb99e2b64dc3e038b6913b3cb1"
+    },
+    {
+      "path": "resources/audio/action-land.wav",
+      "sha256": "5ee7a9b3f74fb3a5a2d8f3c24bebcdd1122859b30bf745d0b3a6fc616dcc1a9d"
+    },
+    {
+      "path": "resources/audio/action-punch-whoosh.wav",
+      "sha256": "ecb08249e47a8809b1274b425fe66483431475bee28e7eebc67e521e26f79f2a"
+    },
+    {
+      "path": "resources/audio/action-slide-rustle.wav",
+      "sha256": "aa8a08db8c50c0235c212c7efd2c692d6b43f4e2831b6f57d421df80a12cbbed"
+    },
+    {
+      "path": "resources/audio/action-spell-beam.wav",
+      "sha256": "da6c512be3874968e9c8fd3574d54b28691cee0d1c83f9d7d19b9629bcb5efc9"
+    },
+    {
+      "path": "resources/audio/action-spell-bloom.wav",
+      "sha256": "50ca79aceced73407e9ac02e06c704cc26eed43874fba9143694e101071b590f"
+    },
+    {
+      "path": "resources/audio/action-spell-cast.wav",
+      "sha256": "4163a0596c02604606aefa6cc6aa280d5532f9ecc8e43411c18732e0dc114a37"
+    },
+    {
+      "path": "resources/audio/action-spell-crown.wav",
+      "sha256": "60bb02fd3edb6e7d3a6fe636263209fd2d0daedaf8f13798ffe21c21622277fe"
+    },
+    {
+      "path": "resources/audio/action-spell-frost.wav",
+      "sha256": "9fcb4b120c0be4c888851850daa6ecc92e2a43a7324a7fa715713b17debfba5f"
+    },
+    {
+      "path": "resources/audio/action-spell-meteor.wav",
+      "sha256": "1764b9d83d7dd5047d015fba26b44b9c18f07ed7c9bd87f9214b6277c3b8cef6"
+    },
+    {
+      "path": "resources/audio/action-spell-rift.wav",
+      "sha256": "d1bc048392b38a5ad78f3cf1820fa8d52043b73f29ff1ff88495148f0685ed68"
+    },
+    {
+      "path": "resources/audio/action-spell-snare.wav",
+      "sha256": "ce8be292c2ca8e3f6798330bf792fa3a264951fa8e5317c0b88c317463431ad1"
+    },
+    {
+      "path": "resources/audio/action-spell-storm.wav",
+      "sha256": "2701c6790151586bbc4197fae4172c197eb173e5eb240052e906f2d9d66f486f"
+    },
+    {
+      "path": "resources/audio/action-spell-wood.wav",
+      "sha256": "a049c1481a198cf730887aa284d1a165cce872cc02a6e888cbc1225818c539eb"
+    },
+    {
+      "path": "resources/audio/action-meal-crunch.wav",
+      "sha256": "46bb35b4be51ad0bf2e854495f65b58f4b81e5b0f29e25cb525692fca9c715f2"
+    },
+    {
+      "path": "resources/audio/action-meal-soft.wav",
+      "sha256": "df2e161d439cc84725d6e1f08b0949aa129fbfcf191897f73046f98b3a9ad2fa"
+    },
+    {
+      "path": "resources/audio/action-run-grass-left.wav",
+      "sha256": "a7ab450a93004cc83c6d37edba374b3997218f95a4cfefea2f088b459af9e8d9"
+    },
+    {
+      "path": "resources/audio/action-run-grass-right.wav",
+      "sha256": "0c0e73d972d2c6778d838e41f18741448b897dade71a32fbd979796b4f6b8230"
+    },
+    {
+      "path": "resources/audio/action-run-hard-left.wav",
+      "sha256": "1b0a661e7827afb72137b761d23aa2dfbe44d2ba804659b6f6d5c951b261adad"
+    },
+    {
+      "path": "resources/audio/action-run-hard-right.wav",
+      "sha256": "deca77dd9b49360dcee20f3a2ca028df34a65688c420fcdb15d2d4167da9ae54"
+    }
+  ]
+}

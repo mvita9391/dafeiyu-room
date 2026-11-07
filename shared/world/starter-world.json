@@ -1,0 +1,660 @@
+{
+  "formatVersion": 1,
+  "worldId": "default",
+  "scenes": [
+    {
+      "sceneId": "bedroom",
+      "name": "卧室",
+      "templateId": "cozy_room_v1",
+      "entities": [
+        {
+          "type": "bed",
+          "position": [
+            -2.52,
+            0,
+            -2.32
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "nightstand",
+          "position": [
+            -3.16,
+            0,
+            -0.92
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "desk",
+          "position": [
+            0.62,
+            0,
+            -2.92
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "chair",
+          "position": [
+            0.58,
+            0,
+            -2.18
+          ],
+          "rotation": 3.141592653589793,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "shelf",
+          "position": [
+            -3.24,
+            0,
+            2.15
+          ],
+          "rotation": 1.5707963267948966,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "lamp",
+          "position": [
+            2.8156056539568857,
+            0,
+            -2.9751997140431956
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "table",
+          "position": [
+            -1.0061108525287015,
+            0,
+            -2.9792893387906045
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "plant",
+          "position": [
+            2.02,
+            0,
+            -2.92
+          ],
+          "rotation": 0,
+          "scale": [
+            1.05,
+            1.05,
+            1.05
+          ]
+        },
+        {
+          "type": "plant",
+          "position": [
+            -3.26,
+            0,
+            3.02
+          ],
+          "rotation": 1.35,
+          "scale": [
+            0.84,
+            0.84,
+            0.84
+          ]
+        },
+        {
+          "type": "rug",
+          "position": [
+            0,
+            0,
+            0.3
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "bean",
+          "position": [
+            2.6163246459727976,
+            0,
+            2.6163246459727976
+          ],
+          "rotation": 5.497787143782138,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "lamp",
+          "position": [
+            1,
+            0,
+            2.6
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "smallPlant",
+          "position": [
+            1.6,
+            0,
+            2.1
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "sceneId": "living",
+      "name": "客厅",
+      "templateId": "cozy_room_v1",
+      "entities": [
+        {
+          "type": "livingSofa",
+          "position": [
+            -0.15,
+            0,
+            1.75
+          ],
+          "rotation": 3.141592653589793,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "livingTable",
+          "position": [
+            -0.1,
+            0,
+            -0.5
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "livingChair",
+          "position": [
+            -2.35,
+            0,
+            0.55
+          ],
+          "rotation": 0.72,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "livingShelf",
+          "position": [
+            -3.24,
+            0,
+            -2.05
+          ],
+          "rotation": 1.5707963267948966,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "livingLamp",
+          "position": [
+            2.55,
+            0,
+            1.15
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "livingPlant",
+          "position": [
+            2.95,
+            0,
+            -2.75
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "livingRug",
+          "position": [
+            -0.1,
+            0.009,
+            0.1
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "sceneId": "yard",
+      "name": "院子",
+      "templateId": "courtyard_v1",
+      "entities": [
+        {
+          "type": "yardPool",
+          "position": [
+            5.722133121590764,
+            0,
+            -5.593368746904727
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardTree",
+          "position": [
+            7.816806744055777,
+            0,
+            5.822385645003105
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardBench",
+          "position": [
+            -0.9740709327856587,
+            0,
+            -7.002725971447021
+          ],
+          "rotation": 13.101768777756625,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardFarm",
+          "position": [
+            -5.800000000000002,
+            0,
+            -5.45
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardLantern",
+          "position": [
+            -1.8,
+            0,
+            5.1
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "smallPlant",
+          "position": [
+            -3.373386721944316,
+            0,
+            -4.354554881408172
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardSwing",
+          "position": [
+            4.582698429526532,
+            0,
+            12.245576904711935
+          ],
+          "rotation": 3.141592653589793,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardCan",
+          "position": [
+            -3.103509400457464,
+            0,
+            -7.100587615586025
+          ],
+          "rotation": 0.5,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardPicnicTable",
+          "position": [
+            -2.626189212356749,
+            0,
+            8.388750712360896
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardFlowerBox",
+          "position": [
+            4.659228156113679,
+            0,
+            6.007641809572897
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "pf-palm-gear-disc-99663a",
+          "position": [
+            3.0664953164278224,
+            0,
+            -3.334467254296534
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "pf-telescoping-pinky-07de50",
+          "position": [
+            3.0664953164278224,
+            0,
+            -3.334467254296534
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "coastalHouse",
+          "position": [
+            12.16195818910227,
+            0,
+            -5.986026982216448
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "yardFlowerBox",
+          "position": [
+            14.830881250828876,
+            0,
+            -5.018583749821552
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "sceneId": "convenience-store",
+      "name": "街角便利店",
+      "templateId": "street_corner_v1",
+      "entities": [
+        {
+          "type": "shopBuilding",
+          "position": [
+            -0.5882265574470606,
+            0,
+            -2.951375438585845
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "shopVending",
+          "position": [
+            4.25,
+            0,
+            -0.35
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "shopLamp",
+          "position": [
+            5.35,
+            0,
+            2.1
+          ],
+          "rotation": 3.141592653589793,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "shopCar",
+          "position": [
+            3.8,
+            0,
+            4.7
+          ],
+          "rotation": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "shopLamp",
+          "position": [
+            -5.3,
+            0,
+            1.2
+          ],
+          "rotation": 0,
+          "scale": [
+            0.85,
+            0.85,
+            0.85
+          ]
+        },
+        {
+          "type": "shopLamp",
+          "position": [
+            -3.4,
+            0,
+            5.65
+          ],
+          "rotation": 0,
+          "scale": [
+            0.75,
+            0.75,
+            0.75
+          ]
+        },
+        {
+          "type": "shopLamp",
+          "position": [
+            1.25,
+            0,
+            5.8
+          ],
+          "rotation": 3.141592653589793,
+          "scale": [
+            0.75,
+            0.75,
+            0.75
+          ]
+        },
+        {
+          "type": "shopLamp",
+          "position": [
+            5.3,
+            0,
+            -4.65
+          ],
+          "rotation": 3.141592653589793,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "portals": [
+    {
+      "portalId": "legacy-bedroom-yard",
+      "kind": "legacy",
+      "fromSceneId": "bedroom",
+      "toSceneId": "yard"
+    },
+    {
+      "portalId": "legacy-yard-bedroom",
+      "kind": "legacy",
+      "fromSceneId": "yard",
+      "toSceneId": "bedroom"
+    },
+    {
+      "portalId": "legacy-living-bedroom",
+      "kind": "legacy",
+      "fromSceneId": "living",
+      "toSceneId": "bedroom"
+    },
+    {
+      "portalId": "legacy-bedroom-living",
+      "kind": "legacy",
+      "fromSceneId": "bedroom",
+      "toSceneId": "living"
+    },
+    {
+      "portalId": "legacy-living-store",
+      "kind": "legacy",
+      "fromSceneId": "living",
+      "toSceneId": "convenience-store"
+    },
+    {
+      "portalId": "legacy-store-living",
+      "kind": "legacy",
+      "fromSceneId": "convenience-store",
+      "toSceneId": "living"
+    }
+  ]
+}
