@@ -3,6 +3,7 @@ const MAX_BATCH_MS=100;
 const MAX_BATCH_FRAMES=120;
 const MAX_RATE_RETRIES=4;
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const needsExit=actor=>actor.pose==='sleeping'||actor.pose==='tree-climbing'||(actor.pose==='seated'&&!actor.resting);
 
 // Pending inputs, rather than predicted positions, are replayed after each ack.
 export class PlayerController {
@@ -14,10 +15,9 @@ export class PlayerController {
  begin(actor,seed=null){
   if(this.active)return;
   this.active=true;this.generation++;
-  // 坐姿动作还没完成（resting 未写入）时，客户端不知道离座落脚点，先冻结预测，
-  // 等服务的取消动作把位置落到离座点再解除 —— 否则会卡在椅子碰撞体里。
-  this.frozen=(actor.pose==='seated'&&!actor.resting)||actor.pose==='tree-climbing';
-  this.state={...actor,position:this.startPosition(actor,seed),pose:this.frozen?actor.pose:(actor.form==='swim'?'swimming':'idle'),resting:null,moving:false,speed:0,form:actor.form||'normal'};
+  // Wait for the server to place the actor beside the furniture or tree.
+  this.frozen=needsExit(actor);
+  this.state={...actor,position:this.startPosition(actor,this.frozen?null:seed),pose:this.frozen?actor.pose:(actor.form==='swim'?'swimming':'idle'),resting:null,moving:false,speed:0,form:actor.form||'normal'};
   this.pending=[];this.sequence=0;this.ack=0;this.lease=null;this.held=false;
   const generation=this.generation;
   this.ready=Promise.resolve(this.takeControl()).then(lease=>{if(generation!==this.generation)return;this.lease=lease;return lease;});
@@ -45,7 +45,7 @@ export class PlayerController {
   // A disconnected tab must not accumulate an unbounded speculative world.
   if(this.pending.reduce((sum,f)=>sum+f.dtMs,0)>1000)this.fail(Error('移动同步超时，请重试'),this.generation);
  }
- stop(){if(!this.active)return;this.holdUntil=this.now()+this.holdMs;this.held=false;this.state={...this.state,moving:false,speed:0,pose:this.state.form==='swim'?'swimming':'idle'};if(this.pending.at(-1)?.dtMs!==0)this.pending.push({sequence:++this.sequence,dtMs:0,direction:[0,0]});}
+ stop(){if(!this.active)return;this.holdUntil=this.now()+this.holdMs;this.held=false;this.state={...this.state,moving:false,speed:0,pose:this.frozen?this.state.pose:this.state.form==='swim'?'swimming':'idle'};if(this.pending.at(-1)?.dtMs!==0)this.pending.push({sequence:++this.sequence,dtMs:0,direction:[0,0]});}
  reconcile(actor){
   if(!this.active||!this.lease)return;
   if(actor.controller&&actor.controller.leaseVersion<this.lease.leaseVersion)return;
@@ -58,7 +58,7 @@ export class PlayerController {
   // 本地操作权保护：正在按键，或松开后的 holdMs 内，服务端位置不回写，
   // 否则被延迟确认的旧位置会把角色弹回去（只同步姿态/需求等非位置字段）。
   // 冻结状态解除时直接采用服务端离座后的位置（不套本地保护），再重放未确认输入
-  const justUnfroze = this.frozen && actor.pose !== 'seated' && actor.pose !== 'tree-climbing';
+  const justUnfroze = this.frozen && !needsExit(actor);
   if (justUnfroze) this.frozen = false;
   const frozen = this.frozen;
   const protectedByLocal = !frozen && !justUnfroze && (this.held || this.now() < this.holdUntil);

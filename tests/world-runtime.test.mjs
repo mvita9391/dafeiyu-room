@@ -166,3 +166,23 @@ test('owner control expires after ten idle seconds and MCP still receives a minu
   assert.equal(acquire().expiresAt,75000);
  }finally{s.db.close();}
 });
+
+test('computer interaction seats the owner facing the bedroom desk and clears on movement',()=>{
+ const s=setup();
+ try{
+  const scene=s.snapshot().entities.filter(e=>e.sceneId==='bedroom');
+  const chair=scene.find(e=>e.type==='chair'),desk=scene.find(e=>e.type==='desk');
+  const token={actorId:'whale',leaseId:s.lease.leaseId,leaseVersion:s.lease.leaseVersion};
+  const result=s.run('action.submit',{...token,kind:'computer',target:{entityId:chair.entityId,anchorId:'approach'}});
+  for(let i=0;i<90&&s.snapshot().actions[result.actionId].status==='running';i++)s.tick();
+  const seated=s.snapshot().actors[0];
+  assert.equal(seated.pose,'seated');
+  assert.equal(seated.computerDeskId,desk.entityId);
+  assert.equal(seated.rotation,Math.atan2(desk.position[0]-chair.position[0],desk.position[2]-chair.position[2]));
+  assert.equal(s.snapshot().actions[result.actionId].status,'completed');
+  s.run('actor.input',{...token,frames:[{sequence:1,dtMs:16,direction:[1,0]}]});
+  const standing=s.snapshot().actors[0];
+  assert.equal(standing.computerDeskId,undefined);
+  assert.equal(standing.position[1],0);
+ }finally{s.db.close();}
+});

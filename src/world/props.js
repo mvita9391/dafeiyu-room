@@ -194,6 +194,7 @@ function makeDesk() {
   const lid = setShadow(new THREE.Mesh(rbox(0.44, 0.30, 0.014, 0.008, 3), bodyM));
   lid.position.y = 0.15; screenG.add(lid);
   const disp = new THREE.Mesh(new THREE.PlaneGeometry(0.40, 0.26), glow(0x9fd8ff, 1.35, { roughness: 0.35 }));
+  disp.name = 'computer-display';
   disp.position.set(0, 0.15, 0.0085); screenG.add(disp);
   laptop.add(screenG);
   laptop.position.set(-0.18, H + 0.03, 0.03);

@@ -39,7 +39,7 @@ export const commandSchema=z.discriminatedUnion('kind',[
  cmd('build.editLock',obj({sceneId:idSchema,locked:z.boolean()})),
  cmd('build.preview',obj({baseRevision:rev,ops:z.array(buildOperationSchema).min(1).max(20)})),
  cmd('build.apply',obj({planId:idSchema})),cmd('build.undo',obj({changeId:idSchema})),
- cmd('action.submit',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,kind:z.enum(['move','sit','sleep','swim','slide','eat','cancel','jump','climbTree','maneuver']),gait:z.enum(GAITS).optional(),maneuver:z.enum(MANEUVERS).optional(),...spellFields,heading:z.number().finite().optional(),target:destination.optional(),foodId:z.enum(Object.keys(FOODS)).optional()})),
+ cmd('action.submit',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,kind:z.enum(['move','sit','sleep','swim','slide','eat','cancel','jump','climbTree','maneuver','computer']),gait:z.enum(GAITS).optional(),maneuver:z.enum(MANEUVERS).optional(),...spellFields,heading:z.number().finite().optional(),target:destination.optional(),foodId:z.enum(Object.keys(FOODS)).optional()})),
  cmd('action.task',task),
  cmd('actor.teleport',obj({actorId:idSchema,sceneId:idSchema})),
  cmd('actor.input',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,frames:z.array(obj({sequence:z.number().int().positive(),jump:z.boolean().optional(),dtMs:z.number().finite().min(0).max(50),direction:z.tuple([z.number().finite().min(-1).max(1),z.number().finite().min(-1).max(1)]),sprint:z.boolean().optional(),crawl:z.boolean().optional(),boxing:z.boolean().optional()})).min(1).max(120)})),

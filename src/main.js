@@ -314,7 +314,8 @@ game.onFeed=()=>foodPicker.open();
 game.getFurniture=()=>registry.scenes.get(activeScene)?.furniture.children||[];
 const teleportEffect=createTeleportEffect();let teleportPending=false;
 async function teleportToScene(id){
- if(teleportPending||!actor||id===actor.sceneId)return;
+ if(teleportPending||!actor)return false;
+ if(id===actor.sceneId)return true;
  if(dispatcher.busy){showMessage('请等待当前操作完成后传送');return;}
  teleportPending=true;keys.clear();
  try{
@@ -324,9 +325,52 @@ async function teleportToScene(id){
   await client.dispatch({kind:'actor.teleport',payload:{actorId:actor.actorId,sceneId:id}});
   actorTimeline.handoff(actor,performance.now());renderPosition.fromArray(actor.position);
   await teleportEffect.arrive();
- }catch(error){showMessage(`传送失败：${error.message}`);}
+  return true;
+ }catch(error){showMessage(`传送失败：${error.message}`);return false;}
  finally{teleportEffect.clear();teleportPending=false;keys.clear();}
 }
+const eventMenu=toolbar.querySelector('#quick-events');
+const QUICK_EVENTS={
+ sleep:{sceneId:'bedroom',type:'bed',label:'床'},
+ computer:{sceneId:'bedroom',type:'chair',label:'电脑桌旁的椅子'},
+ climbTree:{sceneId:'yard',type:'yardTree',label:'树'},
+};
+let quickEventPending=false;
+async function runQuickEvent(kind){
+ if(quickEventPending||!worldReady||!actor||client.connectionStatus!=='connected')return;
+ const {sceneId,type,label}=QUICK_EVENTS[kind];
+ const findTarget=()=>{
+  const entities=client.snapshot.entities.filter(e=>e.sceneId===sceneId);
+  if(kind!=='computer')return entities.find(e=>e.type===type);
+  const desk=entities.find(e=>e.type==='desk');
+  if(!desk)return null;
+  const distanceToDesk=e=>Math.hypot(e.position[0]-desk.position[0],e.position[2]-desk.position[2]);
+  return entities.filter(e=>e.type===type&&distanceToDesk(e)<1.8).sort((a,b)=>distanceToDesk(a)-distanceToDesk(b))[0];
+ };
+ let target=findTarget();
+ if(!target){showMessage(`场景里找不到${label}`);return;}
+ quickEventPending=true;
+ try{
+  stopMovement();stopOrbit();crawling=false;
+  if(editor?.active){await editor.setActive(false);if(editor.active)return;}
+  if(!await teleportToScene(sceneId))return;
+  target=findTarget();
+  if(!target){showMessage(`场景里找不到${label}`);return;}
+  const result=await action(kind,{entityId:target.entityId,anchorId:'approach'},{force:true});
+  if(result){showMessage(`${kind==='computer'?'玩电脑':kind==='sleep'?'睡觉':'爬树'} · 按方向键结束`);localSound.play(kind);}
+ }finally{quickEventPending=false;}
+}
+eventMenu.addEventListener('click',event=>{
+ const kind=event.target.closest('[data-event]')?.dataset.event;
+ if(!kind)return;
+ eventMenu.open=false;
+ eventMenu.querySelector('summary').focus();
+ void runQuickEvent(kind);
+});
+document.addEventListener('pointerdown',event=>{if(!eventMenu.contains(event.target))eventMenu.open=false;});
+eventMenu.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&eventMenu.open){eventMenu.open=false;eventMenu.querySelector('summary').focus();}
+});
 const leftRail=document.createElement('div');leftRail.id='left-rail';leftRail.style.cssText='position:fixed;left:24px;top:110px;z-index:30;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 312px);overflow:auto;padding-right:4px';document.body.append(leftRail);
 const scenePicker=document.createElement('nav');scenePicker.setAttribute('aria-label','场景传送');scenePicker.style.cssText='display:grid;gap:7px;background:#faf1e5ed;padding:12px;border:1px solid #fff9;border-radius:16px;font:14px system-ui;min-width:110px';leftRail.append(scenePicker);
 let scenePickerKey='';
@@ -600,7 +644,7 @@ function updateKeyboard(dt,now){
  if(editor?.active){iso.target.x+=dx/length*4*dt;iso.target.z+=dz/length*4*dt;return;}
  if(portalPending||client.connectionStatus!=='connected')return;
  if(player.active&&player.lease?.expiresAt<=Date.now())player.release();
- if(!player.active)player.begin(actor,{sceneId:actor.sceneId,position:[renderPosition.x,renderPosition.y,renderPosition.z]});
+ if(!player.active)player.begin(actor,whale.state==='sleep'?null:{sceneId:actor.sceneId,position:[renderPosition.x,renderPosition.y,renderPosition.z]});
  const sprinting=(sprintHeld||sprintToggle)&&!crawling&&!whale.boxingActive;
  // Separate two real Space presses even when no simulation frame fell between them.
  if(player.jumpRequested&&player.sample()?.jumpHeld)player.step(client.snapshot,[0,0],0);
@@ -613,6 +657,7 @@ function updateKeyboard(dt,now){
  }
  if(now-lastInputAt>=100){lastInputAt=now;player.flush().catch(()=>{});}
 }
+let activeComputerDisplay;
 let renderedSpellCast;
 const spellHand=()=>original.bones?.handR?.getWorldPosition(new THREE.Vector3());
 function renderActor(dt,t){if(!actor)return;const local=player.sample();let visual={...(local||actorTimeline.sample(performance.now())||actor)};if(local)visual.maneuver=null;currentPose=visual.pose;const next=visual.form==='swim'?blob:original;if(next!==whale){whale.group.visible=false;whale=next;whale.group.visible=true;game.whale=whale;window.__whale=whale;if(next===blob)localSound.play('pool');fx.splash(new THREE.Vector3(...actor.position));}
@@ -641,6 +686,13 @@ function renderActor(dt,t){if(!actor)return;const local=player.sample();let visu
   if(bedPosition)visual={...visual,position:bedPosition.toArray()};
  }
  presentActor(whale,visual,dt,t);
+ const display=visual.computerDeskId&&visual.pose==='seated'
+  ?registry.entities.get(visual.computerDeskId)?.getObjectByName('computer-display'):null;
+ if(activeComputerDisplay!==display){
+  if(activeComputerDisplay)activeComputerDisplay.material.emissiveIntensity=1.35;
+  if(display)display.material.emissiveIntensity=3;
+  activeComputerDisplay=display;
+ }
  renderedSpellCast=visual.lastSpellCast;
  if(travelAction&&!original.blocksWalking){
   const {heading,sceneId}=travelAction;

@@ -108,6 +108,15 @@
     border-radius:12px;cursor:pointer;font:inherit}
   .toolbar-action:hover:not(:disabled){background:#fff3de}
   .toolbar-action:focus-visible{outline:3px solid #b1834a}
+  #quick-events{position:relative}
+  #quick-events summary{box-sizing:border-box;display:flex;align-items:center;gap:6px;list-style:none}
+  #quick-events summary::-webkit-details-marker{display:none}
+  #quick-events summary::after{content:"";width:6px;height:6px;border-right:1px solid;border-bottom:1px solid;transform:translateY(-2px) rotate(45deg)}
+  .event-options{position:absolute;right:0;top:calc(100% + 8px);display:grid;gap:3px;min-width:118px;
+    padding:5px;border:1px solid #dacaba;border-radius:12px;background:#fff9ee;box-shadow:0 12px 25px #36273538}
+  .event-options button{min-height:42px;border:0;border-radius:7px;background:none;color:#51454a;text-align:left;
+    padding:7px 11px;font:inherit;cursor:pointer}
+  .event-options button:hover,.event-options button:focus-visible{background:#fff0d6}
   .btn{white-space:nowrap;display:flex;align-items:center;gap:7px;padding:10px 15px;border-radius:99px;cursor:pointer;
     border:1px solid rgba(255,255,255,.5);background:rgba(255,248,238,.66);
     backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);
@@ -228,6 +237,14 @@
 
   <div id="actions">
     <button class="toolbar-action" type="button" data-act="feed"><span aria-hidden="true">🍚</span> 喂饭</button>
+    <details id="quick-events">
+      <summary class="toolbar-action">事件</summary>
+      <div class="event-options">
+        <button type="button" data-event="sleep">睡觉</button>
+        <button type="button" data-event="computer">玩电脑</button>
+        <button type="button" data-event="climbTree">爬树</button>
+      </div>
+    </details>
   </div>
 
 <div id="loading">

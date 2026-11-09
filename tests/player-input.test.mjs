@@ -265,3 +265,31 @@ test('movement receipts deduplicate within ten minutes and expired input cannot 
   assert.equal(expired.actor.input.sequence,1);
  }finally{s.db.close();}
 });
+
+test('holding a movement key wakes up and adopts the walkable bedside position',async()=>{
+ const {PlayerController}=await import('../src/core/player-controller.js');
+ const {walkable}=await import('../shared/world/navigation.js');
+ const s=setup();
+ try{
+  s.service.transactRuntime('default',({snapshot})=>{
+   snapshot.entities.push({entityId:'test-bed',sceneId:'bedroom',type:'bed',position:[0,0,-1.8],rotation:0,scale:[.65,.65,.65]});
+  });
+  const token={actorId:'whale',leaseId:s.lease.leaseId,leaseVersion:s.lease.leaseVersion};
+  s.run('action.submit',{...token,kind:'sleep',target:{entityId:'test-bed',anchorId:'approach'}});
+  for(let i=0;i<50&&s.snapshot().actors[0].pose!=='sleeping';i++){s.advance(100);s.runtime.tick();}
+  const asleep=s.snapshot().actors[0];
+  assert.equal(asleep.pose,'sleeping');
+  const player=new PlayerController({
+   takeControl:async()=>s.run('control.takeover',{actorId:'whale'}),
+   send:async payload=>s.run('actor.input',payload),
+  });
+  player.begin(asleep,{sceneId:asleep.sceneId,position:asleep.position});
+  player.step(s.snapshot(),[1,0],.05);
+  await player.flush();
+  const standing=player.sample();
+  assert.equal(standing.position[1],0);
+  assert.ok(walkable(s.snapshot(),'bedroom',standing.position));
+  player.step(s.snapshot(),[1,0],.05);
+  assert.ok(player.sample().position[0]>standing.position[0]);
+ }finally{s.db.close();}
+});
