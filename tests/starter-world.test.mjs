@@ -13,6 +13,34 @@ test('published baseline initializes four scenes with the frozen current furnitu
 test('AI construction stays in its save; restarting with newer defaults never overwrites it',()=>{
  const file=new URL('../shared/world/starter-world.json',import.meta.url);const before=readFileSync(file,'utf8');const db=new DatabaseSync(':memory:');try{migrateWorld(db);const svc=new WorldService(db,{handlers:createBuildHandlers()});const p={subjectId:'agent',role:'agent',worldIds:['default'],actorIds:['whale'],scopes:['world:read','build:write']};let n=0;const run=(kind,payload)=>svc.execute(p,{worldId:'default',requestId:`starter-${++n}`,kind,payload});const plan=run('build.preview',{baseRevision:0,ops:[{kind:'scene.create',ref:'ai-room',templateId:'cozy_room_v1',name:'AI的新房间'}]});run('build.apply',{planId:plan.planId});const saved=db.prepare('SELECT snapshot FROM worlds').get().snapshot;const changed=structuredClone(defaultManifest);changed.scenes[0].name='新版默认卧室';assert.equal(migrateWorld(db,{defaultManifest:changed}).imported,false);assert.equal(db.prepare('SELECT snapshot FROM worlds').get().snapshot,saved);assert.equal(JSON.parse(saved).scenes.length,5);assert.equal(readFileSync(file,'utf8'),before);}finally{db.close();}
 });
+test('an old save can restore the published courtyard without changing other scenes or farm plots',()=>{
+ const db=new DatabaseSync(':memory:');
+ try{
+  const old=structuredClone(defaultManifest);
+  const courtyard=old.scenes.find(scene=>scene.sceneId==='yard');
+  courtyard.entities.find(entity=>entity.type==='yardPool').position=[5.72,0,-5.59];
+  courtyard.entities.find(entity=>entity.type==='yardFarm').position=[-5.8,0,-5.45];
+  migrateWorld(db,{defaultManifest:old});
+  const service=new WorldService(db,{handlers:createBuildHandlers()});
+  const owner={subjectId:'owner',role:'owner',worldIds:['default'],scopes:['build:write']};
+  const before=service.readSnapshot('default');
+  const command={worldId:'default',requestId:'restore-courtyard',kind:'build.resetScene',payload:{sceneId:'yard',baseRevision:before.layoutRevision}};
+  assert.throws(()=>service.execute({...owner,role:'agent'},command),/UNAUTHORIZED/);
+  const result=service.execute(owner,command);
+  assert.deepEqual(service.execute(owner,command),result);
+  const after=service.readSnapshot('default');
+  const courtyardLayout=after.entities.filter(entity=>entity.sceneId==='yard')
+   .map(({type,position,rotation,scale})=>({type,position,rotation,scale}));
+  assert.deepEqual(courtyardLayout,defaultManifest.scenes.find(scene=>scene.sceneId==='yard').entities);
+  assert.deepEqual(after.entities.filter(entity=>entity.sceneId!=='yard'),before.entities.filter(entity=>entity.sceneId!=='yard'));
+  assert.deepEqual(after.portals,before.portals);
+  const oldFarm=before.entities.find(entity=>entity.type==='yardFarm'),farm=after.entities.find(entity=>entity.type==='yardFarm');
+  assert.equal(farm.entityId,oldFarm.entityId);
+  assert.deepEqual(farm.plots,oldFarm.plots);
+  assert.notEqual(farm.protectionFingerprint,oldFarm.protectionFingerprint);
+  assert.throws(()=>service.execute(owner,{...command,requestId:'stale-reset'}),/REVISION_CONFLICT/);
+ }finally{db.close();}
+});
 test('publisher whitelists only layout fields and excludes runtime identity, credentials and actor state',async()=>{
  const {createStarterWorld}=await import('../server/world/starter.js');const scenes=defaultManifest.scenes.map(s=>({...s,status:'active',editLock:{subjectId:'SECRET'},legacyRevision:88}));const snapshot={worldId:'default',scenes,entities:scenes.flatMap(s=>s.entities.map(e=>({...e,sceneId:s.sceneId,entityId:'private-id',subjectId:'SECRET'}))),portals:defaultManifest.portals,actors:[{controller:'SECRET'}],grants:'SECRET',events:'SECRET'};const seed=createStarterWorld(snapshot);assert.equal(seed.scenes.length,4);assert.ok(!JSON.stringify(seed).includes('SECRET'));assert.ok(!JSON.stringify(seed).includes('private-id'));assert.equal(seed.actors,undefined);assert.equal(seed.scenes[0].editLock,undefined);assert.equal(seed.scenes[0].entities[0].sceneId,undefined);
 });

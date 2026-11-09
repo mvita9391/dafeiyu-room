@@ -1,6 +1,14 @@
+import {createHash} from 'node:crypto';
 import {validLayout} from '../../shared/layout.js';
 import {getTemplate} from '../../shared/world/templates.js';
+import {farmPlots} from '../../shared/world/default-manifest.js';
 export const STARTER_SCENES=['bedroom','living','yard','convenience-store'];
+
+export function protectFarm(entity,plots=structuredClone(farmPlots)){
+ const {position,rotation,scale}=entity;
+ const protectionFingerprint=createHash('sha256').update(JSON.stringify({position,rotation,scale,plots})).digest('hex');
+ return {...entity,protected:true,plots,protectionFingerprint};
+}
 // Explicit release operation only. Runtime/MCP handlers never call this exporter.
 export function createStarterWorld(snapshot){
  if(snapshot.entities.some(e=>e.type.startsWith("town-"))||snapshot.scenes.some(s=>s.templateId?.startsWith("local_")))throw Error("LOCAL_ASSETS_NOT_PUBLISHABLE");

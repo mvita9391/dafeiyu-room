@@ -1,5 +1,5 @@
-import {createHash} from 'node:crypto';
-import {defaultManifest as builtIn,farmPlots} from '../../shared/world/default-manifest.js';
+import {defaultManifest as builtIn} from '../../shared/world/default-manifest.js';
+import {protectFarm} from '../world/starter.js';
 import {readBundledModels} from '../local-assets.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {validLayout,normalizeSceneId} from '../../shared/layout.js';
@@ -44,8 +44,7 @@ export function migrateWorld(db,{defaultManifest=builtIn}={}){
     const value={entityId,sceneId,type:entity.type,position:[...entity.position],rotation:entity.rotation,scale:[...entity.scale],legacy:true};
     // Identity is assigned by occurrence, never by furniture type or transform.
     value.entityId=entityId;value.sceneId=sceneId;
-    if(value.type==='yardFarm'){value.protected=true;value.plots=structuredClone(farmPlots);value.protectionFingerprint=createHash('sha256').update(JSON.stringify({position:value.position,rotation:value.rotation,scale:value.scale,plots:value.plots})).digest('hex');}
-    entities.push(value);
+    entities.push(value.type==='yardFarm'?protectFarm(value):value);
    });
    if(row)warnings.push({sceneId,code:'LEGACY_LAYOUT_PRESERVED',message:'历史布局原样保留，空间冲突待建设规则检查。'});
   }

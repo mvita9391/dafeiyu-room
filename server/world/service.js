@@ -2,6 +2,7 @@ import {installConsumers,recordDelivery,confirmEvents,resumeConsumer,snapshotRec
 import {randomUUID} from 'node:crypto';
 import {validateCommand} from '../../shared/world/schema.js';
 import {defaultManifest} from '../../shared/world/default-manifest.js';
+import {protectFarm} from './starter.js';
 import {nearestFree} from '../../shared/world/navigation.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {appendEvent,readEvents,readLatestCursor,projectEventPage} from './events.js';
@@ -149,7 +150,14 @@ export class WorldService{
    const snapshot=this.readSnapshot(command.worldId);const handler=this.handlers[command.kind];if(!handler)throw Error('NOT_IMPLEMENTED');
    const {actorId}=command.payload;
    if(actorId&&!command.kind.startsWith('battle.')&&snapshot.actors.some(actor=>actor.actorId===actorId&&actor.battle))throw Error('ACTOR_IN_BATTLE');
-   const protectedEntities=snapshot.entities.filter(entity=>entity.protected).map(entity=>[entity.entityId,canonical(entity)]);
+   const resetFarm=command.kind==='build.resetScene'
+    ?defaultManifest.scenes.find(scene=>scene.sceneId===command.payload.sceneId)?.entities.find(entity=>entity.type==='yardFarm')
+    :null;
+   const protectedEntities=snapshot.entities.filter(entity=>entity.protected).map(entity=>{
+    const expected=resetFarm&&entity.sceneId===command.payload.sceneId&&entity.type==='yardFarm'
+     ?protectFarm({...entity,...resetFarm},entity.plots):entity;
+    return [entity.entityId,canonical(expected)];
+   });
    const {schemaVersion}=snapshot;
    const changeId=randomUUID();const pending=[];
    // Handlers are synchronous: mutate detached snapshot and emit factual events.

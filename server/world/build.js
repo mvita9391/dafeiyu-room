@@ -2,7 +2,9 @@ import {surfaceAt} from '../../shared/world/coastal.js';
 import {randomUUID} from 'node:crypto';
 import {getCatalogEntry} from '../../shared/world/catalog.js';
 import {getTemplate} from '../../shared/world/templates.js';
-import {sceneRoute,findPath,nearestFree,invalidateNavigationCache} from '../../shared/world/navigation.js';
+import {sceneRoute,findPath,nearestFree,invalidateNavigationCache,walkable} from '../../shared/world/navigation.js';
+import {defaultManifest} from '../../shared/world/default-manifest.js';
+import {protectFarm} from './starter.js';
 import {validateSpatial,overlapsRect} from './spatial.js';
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const fail=(code,details)=>{const error=Error(code);error.details=details;throw error;};
@@ -22,7 +24,38 @@ function simulate(before,ops,ids){const s=structuredClone(before),resolve=id=>id
  for(const action of Object.values(before.actions||{})){const id=action.entityId||action.target?.entityId;if(action.status==='running'&&id&&!same(before.entities.find(e=>e.entityId===id),s.entities.find(e=>e.entityId===id)))throw Error('ENTITY_IN_USE');}
  invalidateNavigationCache(s);try{validateSpatial(before,s);}catch(error){if(['PORTAL_BLOCKED','PATH_BLOCKED'].includes(error.message)){const endpoints=error.details?.endpoints||[];const failingPortalId=error.details?.portalId;const available={...s,portals:s.portals.filter(p=>p.kind==='legacy'||p.id!==failingPortalId)};const sceneIds=[...new Set(endpoints.map(end=>end.sceneId))];error.details={...error.details,endpoints,availableSlots:sceneIds.flatMap(sceneId=>listPortalSlots(available,sceneId).filter(slot=>!slot.occupied&&!slot.blocked&&slot.reachable).map(slot=>({...slot,sceneId})))};}throw error;}return s;
 }
+function resetScene({snapshot,command,principal,now,emit}){
+ if(principal.role!=='owner')throw Error('UNAUTHORIZED');
+ if(snapshot.paused)throw Error('WORLD_PAUSED');
+ const {sceneId,baseRevision}=command.payload;
+ if(baseRevision!==snapshot.layoutRevision)throw Error('REVISION_CONFLICT');
+ const scene=snapshot.scenes.find(scene=>scene.sceneId===sceneId);
+ const baseline=defaultManifest.scenes.find(scene=>scene.sceneId===sceneId);
+ if(!baseline||scene?.templateId!==baseline.templateId)throw Error('DEFAULT_LAYOUT_UNAVAILABLE');
+ checkLocks(snapshot,[{sceneId}],principal.subjectId,now);
+ const current=snapshot.entities.filter(entity=>entity.sceneId===sceneId);
+ const farm=current.find(entity=>entity.type==='yardFarm'&&entity.protected);
+ const ids=new Set(current.map(entity=>entity.entityId));
+ const actors=snapshot.actors.filter(actor=>actor.sceneId===sceneId);
+ if(actors.some(actor=>actor.actionId||actor.resting||actor.battle)||
+    Object.values(snapshot.actions||{}).some(action=>action.status==='running'&&
+      [action.entityId,action.target?.entityId].some(id=>ids.has(id))))throw Error('ENTITY_IN_USE');
+ const restored=baseline.entities.map(layout=>{
+  const entity={...structuredClone(layout),sceneId,entityId:randomUUID(),legacy:true};
+  if(entity.type!=='yardFarm')return entity;
+  return protectFarm(farm?{...farm,...layout}:entity,farm?.plots);
+ });
+ const entities=snapshot.entities.filter(entity=>entity.sceneId!==sceneId).concat(restored);
+ const next={...snapshot,entities};
+ if(actors.some(actor=>!walkable(next,sceneId,actor.position)&&walkable(snapshot,sceneId,actor.position)))throw Error('ACTOR_BLOCKED');
+ if(listPortalSlots(next,sceneId).some(slot=>slot.occupied&&slot.blocked))throw Error('PORTAL_BLOCKED');
+ snapshot.entities=entities;
+ snapshot.layoutRevision++;
+ emit('build.reset',{sceneId,layoutRevision:snapshot.layoutRevision});
+ return {status:'reset',sceneId,layoutRevision:snapshot.layoutRevision};
+}
 export function createBuildHandlers(){return {
+ 'build.resetScene':resetScene,
  'build.editLock':({snapshot,command,principal,now,emit})=>{if(principal.role!=='owner')throw Error('UNAUTHORIZED');const scene=snapshot.scenes.find(s=>s.sceneId===command.payload.sceneId);if(!scene)throw Error('SCENE_NOT_FOUND');scene.editLock=command.payload.locked?{subjectId:principal.subjectId,expiresAt:now+60000}:null;emit('build.edit_lock',{sceneId:scene.sceneId,locked:command.payload.locked});return {status:command.payload.locked?'locked':'released',expiresAt:scene.editLock?.expiresAt};},
  'build.preview':({snapshot,command,principal,now})=>{if(snapshot.paused)throw Error('WORLD_PAUSED');const {baseRevision,ops}=command.payload;if(baseRevision!==snapshot.layoutRevision)throw Error('REVISION_CONFLICT');const refs=ops.filter(o=>o.ref).map(o=>o.ref);if(new Set(refs).size!==refs.length||refs.some(r=>snapshot.scenes.some(s=>s.sceneId===r)||snapshot.entities.some(e=>e.entityId===r)))throw Error('DUPLICATE_REF');const ids=Object.fromEntries(refs.map(ref=>[ref,randomUUID()]));ops.forEach((op,i)=>{if(op.kind==='portal.link')ids[`portal-${i}`]=randomUUID();});checkLocks(snapshot,ops,principal.subjectId,now);const next=simulate(snapshot,ops,ids),planId=randomUUID(),expiresAt=now+300000; snapshot.buildPlans??={};snapshot.buildPlans[planId]={subjectId:principal.subjectId,baseRevision,ops,ids,expiresAt};return {status:'previewed',planId,expiresAt,diff:{ops:ops.map(op=>{if(!['entity.add','entity.transform'].includes(op.kind))return op;const e=next.entities.find(e=>e.entityId===(ids[op.ref]||op.entityId));return e?{...op,position:e.position}:op;}),createdIds:ids},validation:{ok:true},blueprint:next.scenes.map(s=>({sceneId:s.sceneId,entities:next.entities.filter(e=>e.sceneId===s.sceneId).map(e=>({entityId:e.entityId,type:e.type,position:e.position,rotation:e.rotation,scale:e.scale}))}))};},
  'build.apply':({snapshot,command,principal,now,changeId,emit,db})=>{if(snapshot.paused)throw Error('WORLD_PAUSED');const plan=snapshot.buildPlans?.[command.payload.planId];if(!plan||plan.subjectId!==principal.subjectId)throw Error('PLAN_NOT_FOUND');if(plan.expiresAt<=now)throw Error('PLAN_EXPIRED');if(plan.baseRevision!==snapshot.layoutRevision)throw Error('REVISION_CONFLICT');checkLocks(snapshot,plan.ops,principal.subjectId,now);const before=Object.fromEntries(['scenes','entities','portals'].map(k=>[k,structuredClone(snapshot[k])]));const next=simulate(snapshot,plan.ops,plan.ids);for(const key of ['scenes','entities','portals'])snapshot[key]=next[key];snapshot.layoutRevision++;if(!same(before.portals,next.portals))snapshot.topologyRevision++;const record={subjectId:principal.subjectId,before,after:Object.fromEntries(['scenes','entities','portals'].map(k=>[k,snapshot[k]])),revision:snapshot.layoutRevision};db.prepare('INSERT INTO build_history VALUES(?,?,?)').run(snapshot.worldId,changeId,JSON.stringify(record));delete snapshot.buildPlans[command.payload.planId];emit('build.applied',{layoutRevision:snapshot.layoutRevision,createdIds:plan.ids});return {status:'applied',layoutRevision:snapshot.layoutRevision,createdIds:plan.ids};},

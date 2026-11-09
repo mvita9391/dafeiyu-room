@@ -47,8 +47,18 @@ const settings=mountSettings({
  toolbar,
  onOpen:()=>{stopMovement();stopOrbit();pauseKeyboardWalking();},
  onConnect:onClose=>void agentConnect.open({onClose}),
- canReset:()=>Boolean(editor?.context&&!editor.context.loading),
- onReset:()=>editor?.requestReset(),
+ canReset:()=>editor?.canReset(),
+ onReset:async()=>{
+  try{
+   const restored=await editor?.requestReset();
+   if(restored)showMessage('已恢复当前版本的默认布局');
+   return restored;
+  }catch(error){
+   const reasons={LAYOUT_SAVE_PENDING:'请先保存当前布置',ENTITY_IN_USE:'请先结束当前互动',ACTOR_BLOCKED:'请先把角色移到空地',PORTAL_BLOCKED:'默认摆放与当前门口冲突',REVISION_CONFLICT:'布局已更新，请重新确认'};
+   showMessage(`恢复默认失败 · ${reasons[error.message]??error.message}`);
+   return false;
+  }
+ },
 });
 import {Whale} from "./characters/whale.js";
 import characterConfig from "virtual:character-config";
