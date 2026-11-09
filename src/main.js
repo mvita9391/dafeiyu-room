@@ -1,8 +1,14 @@
+import {poolAt,waterAt} from '/shared/world/water.js';
+import {forestLakeDepth} from '/shared/world/forest.js';
+import {createBaizeEncounter} from './core/baize-encounter.js';
+import {createBaizeFollower} from './characters/baize.js';
+import {mountBaizeBattle} from './ui/baize-battle.js';
 import {createTeleportEffect} from "./ui/teleport-effect.js";
 import {mountAuthorExamples} from "./ui/author-examples.js";
 import {discoverLocalAssets,localAssetCache,prepareLocalSnapshot} from "./world/local-assets.js";
 import {registerLocalFurniture} from "./world/props.js";
 import {LocalSound} from "./core/local-sound.js";
+import {UI_SOUND} from "./core/sound-dictionary.js";
 import {mountAudioPlayer} from "./core/audio-playback.js";
 import * as THREE from "three";
 import {createRenderer} from "./core/renderer.js";
@@ -14,7 +20,7 @@ import {FirstPersonCamera} from "./core/first-person.js";
 import {ThirdPersonCamera} from "./core/third-person.js";
 import {resolveThirdPersonFacing,createThirdPersonFacingState,thirdPersonMoveDirection,thirdPersonMoveFacing,thirdPersonMoveAxis} from "./core/third-person-follow.js";
 import {showEnclosure} from "./world/enclosure.js";
-import {createSkyDome,setSkyMood} from "./core/fp-sky.js";
+import {createSkyDome,FOREST_SUNNY_SKY,setSkyMood} from "./core/fp-sky.js";
 import {contactShadowTexture,tex} from "./core/textures.js";
 import {mountViewToggle} from "./ui/view-toggle.js";
 import {mountActionPanel} from "./ui/action-panel.js";
@@ -51,15 +57,43 @@ import {FX} from "./effects/fx.js";
 import {HUD} from "./ui/hud.js";
 import {RoomEditor} from "./ui/room-editor.js";
 import {Interactions} from "./interactions.js";
-import {portalInwardNormal} from "./core/keyboard-portals.js";
+import {portalInwardNormal,reachesKeyboardPortal} from "./core/keyboard-portals.js";
 import {portalEnds,walkable,segmentWalkable} from "/shared/world/navigation.js";
+import {YARD_FOREST_SLOT} from "/shared/world/templates.js";
 import {getCatalogEntry} from "/shared/world/catalog.js";
 import {PLAYER_SPEED} from "/shared/world/movement.js";
 
 setupBackdrop();
 const R=createRenderer(document.getElementById('app')),scene=new THREE.Scene(),iso=new IsoCamera(),camera=iso.camera;
 setupEnvironment(R.renderer,scene);const lights=setupLights(scene,{windowPos:new THREE.Vector3(.05,1.6,-3.4)});
-const lightDefaults=Object.fromEntries(Object.entries(lights).map(([key,light])=>[key,light.intensity]));
+const lightDefaults=Object.fromEntries(Object.entries(lights).map(([key,light])=>[key,{intensity:light.intensity,color:light.color.clone()}]));
+const defaultGroundLight=lights.hemi.groundColor.clone();
+const defaultSunPosition=lights.sun.position.clone(),defaultSunTarget=lights.sun.target.position.clone();
+const forestFog=new THREE.Fog(FOREST_SUNNY_SKY.horizon,38,108);
+const forestSunOffset=new THREE.Vector3(8,14,6);
+let forestLighting=false;
+function followForestSun(){
+ lights.sun.target.position.set(Math.round(renderPosition.x/2)*2,Math.round(renderPosition.y/2)*2,Math.round(renderPosition.z/2)*2);
+ lights.sun.position.copy(lights.sun.target.position).add(forestSunOffset);
+}
+function applySceneLighting(templateId){
+ forestLighting=templateId==='forest_v1';
+ const street=templateId==='street_corner_v1';
+ const daylight={sun:2.55,hemi:1.03,fill:.58,window:0,lamp:0,screen:0};
+ const daylightColors={sun:0xfff3d9,hemi:0xe1f2ff,fill:0xc3ddff};
+ for(const [key,light] of Object.entries(lights)){
+  light.intensity=forestLighting?daylight[key]:lightDefaults[key].intensity*(street?({sun:1.1,hemi:1.5,fill:1.15}[key]??0):1);
+  light.color.set(forestLighting?(daylightColors[key]??lightDefaults[key].color):lightDefaults[key].color);
+ }
+ lights.hemi.groundColor.set(forestLighting?0x8b9d72:defaultGroundLight);
+ scene.fog=forestLighting?forestFog:null;
+ if(forestLighting)followForestSun();
+ else{
+  lights.sun.position.copy(defaultSunPosition);
+  lights.sun.target.position.copy(defaultSunTarget);
+ }
+ lights.sun.shadow.needsUpdate=true;
+}
 let yard=null;const props={group:new THREE.Group()};
 const registry=new SceneRegistry({scene,createFurniture,lazy:true,legacy:{
  bedroom:()=>{const room=buildRoom(),p=buildProps(),root=new THREE.Group();root.add(room.group,p.group);return {root,furniture:p.group,view:{target:new THREE.Vector3(.15,1.05,0),zoom:1.02},update:(dt,t)=>{room.update?.(dt,t);p.update?.(dt,t);}};},
@@ -115,6 +149,7 @@ fpShadow.rotation.x=-Math.PI/2;fpShadow.visible=false;fpShadow.renderOrder=1;sce
 function linkedPortalSlots(sceneId){const out=[];for(const portal of client.snapshot?.portals||[])for(const end of [portal.from,portal.to])if(end?.sceneId===sceneId&&end.slotId)out.push(end.slotId);return out;}
 function skyMoodFor(cfg){
  const kind=cfg?.template?.kind;
+ if(cfg?.data?.templateId==='forest_v1')return FOREST_SUNNY_SKY;
  if(cfg?.data?.templateId==='street_corner_v1')return {top:'#8fb6d6',horizon:'#dfe7ea',bottom:'#cbd3d2'};
  if(kind==='outdoor')return {top:'#9dbbd8',horizon:'#e8d4c0',bottom:'#cdb59e'};
  return {top:'#6f6a9e',horizon:'#d9a08f',bottom:'#c98f7c'};
@@ -122,14 +157,26 @@ function skyMoodFor(cfg){
 let fpActive=false,thirdActive=false,currentPose='idle',actionPanel=null;
 const viewToggle=mountViewToggle({canvas:R.renderer.domElement,onToggle:cycleView,onExit:exitView,isActive:()=>fpActive,isBlocked:()=>Boolean(editor?.active||editor?.resetPending||game.editing||settings.isOpen||agentConnect.panel||!worldReady)});
 const localSound=new LocalSound();game.onVoice=kind=>localSound.play(kind);
+const confirmClick=()=>localSound.playAction(UI_SOUND.confirm);
+game.onClickSound=confirmClick;
+document.addEventListener('click',event=>{
+ if(event.button!==0)return;
+ const target=event.target;
+ const control=target.closest?.('button, a[href], summary, select, input:not([type="hidden"]), [role="button"], [role="tab"], [role="menuitem"]');
+ if(control){
+  if(!control.closest(':disabled, [aria-disabled="true"], [inert], [hidden]'))confirmClick();
+ }else if(target.matches?.('dialog.settings-dialog, .agent-connect-backdrop'))confirmClick();
+},true);
 original.onActionSound=cue=>localSound.playAction(cue);
 const transportMode=new URLSearchParams(location.search).get('transport')||'auto';
 const client=new WorldClient({pollMs:100,prepareSnapshot:prepareLocalSnapshot,transport:transportMode}),actorTimeline=new ActorTimeline();let editor=null,activeScene=null,actor=null,lease=null,takeover=null,lastInputAt=0,lastPortalAt=0,portalPending=false;
 const keys=new Set(),goal=new THREE.Vector3(),renderPosition=new THREE.Vector3();
 let sprintHeld=false,sprintToggle=false,crawling=false,shiftHintAt=0,frameErrorAt=0,fpLockTimer=0,worldReady=false;
+let diveRequested,swimDepth=0;
 let wantSlide=false,slideUntil=0,slideDirX=0,slideDirZ=0,runningJump=false;
 const WALK_FLYING_KICK_DISTANCE=1;
 const SPRINT_FLYING_KICK_DISTANCE=2;
+const AIR_FLYING_KICK_DISTANCE=3;
 const ROLL_CHAIN_WINDOW_SECONDS=0.26;
 let travelAction=null;
 // 第一视角卡死排查：帧间隔、长任务、指针锁事件、运行时错误
@@ -143,7 +190,14 @@ const sprintStatus=document.getElementById('sprint-status');
 let statusMessageUntil=0;
 function showMessage(message){
  statusMessageUntil=performance.now()+4000;
- status.removeAttribute('data-control');
+ const connection=client.connectionStatus;
+ if(connection==='offline'){
+  status.dataset.control='offline';
+  message='世界连接中断 · 正在自动重连';
+ }else{
+  status.removeAttribute('data-control');
+  if(connection==='unauthorized')message='主人会话已失效，请刷新页面重新连接';
+ }
  status.textContent=message;
 }
 function updateControlStatus(now=performance.now()){
@@ -257,7 +311,7 @@ function clampThirdCameraToRoom(){
  if(Math.abs(x-c.x)>1e-4||Math.abs(z-c.z)>1e-4||Math.abs(y-c.y)>1e-4){c.set(x,y,z);tp.camera.lookAt(tp._look);}
 }
 client.onStatus(value=>{if(value==='connected'){statusMessageUntil=0;updateControlStatus();}else{keys.clear();player.release();lease=null;showMessage(value==='unauthorized'?'主人会话已失效，请刷新页面重新连接':'世界离线 · 草稿已保留，正在重连');}});
-function showScene(id){const cfg=registry.scenes.get(id);if(!cfg)return;if(activeScene!==id)original.cancelSpellCast?.();activeScene=id;registry.show(id);refreshScenePicker();const street=cfg.data.templateId==='street_corner_v1';scene.background=street?new THREE.Color(0xc9e5ed):(cfg.data.templateId==='coastal_town_v1'||cfg.template.authorSceneId)?new THREE.Color(0xd8e6dd):null;for(const [key,light]of Object.entries(lights))light.intensity=lightDefaults[key]*(street?({sun:1.1,hemi:1.5,fill:1.15}[key]??0):1);iso.setProfile(cfg.data.templateId);iso.setView(cfg.view.target,cfg.view.zoom);iso.target.copy(iso.homeTarget);iso.zoom=iso.homeZoom;iso.zoomTarget=iso.homeZoom;iso.drag=iso.dragTarget=0;iso.par.set(0,0);iso.parTarget.set(0,0);game.setScene(cfg);whale.bounds=cfg.bounds;whale.colliders=null;if(fpActive){showEnclosure(cfg,true,linkedPortalSlots(id));setSkyMood(skyDome,skyMoodFor(cfg));fp.yaw=actor?.rotation??fp.yaw;}else if(thirdActive){showEnclosure(cfg,true,linkedPortalSlots(id));setSkyMood(skyDome,skyMoodFor(cfg));tp.yaw=actor?.rotation??tp.yaw;}editor?.setContext(id);const loc=document.getElementById('loc');if(loc)loc.textContent=`${cfg.label}`;lastPortalAt=performance.now();}
+function showScene(id){const cfg=registry.scenes.get(id);if(!cfg)return;if(activeScene!==id)original.cancelSpellCast?.();activeScene=id;registry.show(id);refreshScenePicker();const street=cfg.data.templateId==='street_corner_v1';scene.background=street?new THREE.Color(0xc9e5ed):cfg.data.templateId==='forest_v1'?new THREE.Color(FOREST_SUNNY_SKY.horizon):(cfg.data.templateId==='coastal_town_v1'||cfg.template.authorSceneId)?new THREE.Color(0xd8e6dd):null;applySceneLighting(cfg.data.templateId);iso.setProfile(cfg.data.templateId);iso.setView(cfg.view.target,cfg.view.zoom);iso.target.copy(iso.homeTarget);iso.zoom=iso.homeZoom;iso.zoomTarget=iso.homeZoom;iso.drag=iso.dragTarget=0;iso.par.set(0,0);iso.parTarget.set(0,0);game.setScene(cfg);whale.bounds=cfg.bounds;whale.colliders=null;if(fpActive){showEnclosure(cfg,true,linkedPortalSlots(id));setSkyMood(skyDome,skyMoodFor(cfg));fp.yaw=actor?.rotation??fp.yaw;}else if(thirdActive){showEnclosure(cfg,true,linkedPortalSlots(id));setSkyMood(skyDome,skyMoodFor(cfg));tp.yaw=actor?.rotation??tp.yaw;}editor?.setContext(id);const loc=document.getElementById('loc');if(loc)loc.textContent=`${cfg.label}`;lastPortalAt=performance.now();}
 let activeMeal;
 client.onEvent(({kind,data})=>{
  if(!activeMeal||data?.actionId!==activeMeal.actionId)return;
@@ -267,8 +321,22 @@ client.onEvent(({kind,data})=>{
 function applyRenderSnapshot(snapshot){
  registry.applySnapshot(snapshot);refreshScenePicker();
  if(editor){const missing=Object.values(registry.contexts).some(c=>!c.sync);if(missing)editor.updateWorldContexts();}
- if(actor&&activeScene!==actor.sceneId){renderPosition.fromArray(actor.position);showScene(actor.sceneId);}
+ if(actor&&activeScene!==actor.sceneId){
+  const destination=registry.scenes.get(actor.sceneId);
+  if(activeScene&&destination&&!teleportPending&&!baizeBattle.active&&!actor.battle){
+   localSound.playAction('scene-transition');
+   void teleportEffect.reveal(destination.label);
+  }
+  renderPosition.fromArray(actor.position);showScene(actor.sceneId);
+  if(!actor.battle)playSceneMusic();
+ }
  game._syncStats();
+}
+function playSceneMusic(){
+ const cfg=registry.scenes.get(activeScene);
+ if(!cfg)return;
+ const type=cfg.data.templateId;
+ localSound.setMusic(type==='forest_v1'?'wild':type==='courtyard_v1'||cfg.template.kind==='indoor'?'home':'city');
 }
 client.onSnapshot(snapshot=>{
  const next=snapshot.actors.find(a=>a.actorId==='whale')||snapshot.actors[0];if(!next)return;
@@ -296,8 +364,63 @@ async function control(force=false){if(takeover)return takeover;if(!force&&lease
   .then(result=>{lease=result;if(player?.active)player.lease=result;return result;}).finally(()=>takeover=null);return takeover;}
 const dispatcher=new ActionDispatcher(async(kind,target,{force=false,foodId}={})=>{if(!actor||client.connectionStatus!=='connected')return;try{const token=await control(force);const current=client.snapshot.actors.find(a=>a.actorId===actor.actorId);if(kind!=='cancel'&&current.actionId&&!(kind==='move'&&client.snapshot.actions[current.actionId]?.kind==='move')){await client.dispatch({kind:'action.submit',payload:{actorId:actor.actorId,leaseId:token.leaseId,leaseVersion:token.leaseVersion,kind:'cancel'}});}return await client.dispatch({kind:'action.submit',payload:{actorId:actor.actorId,leaseId:token.leaseId,leaseVersion:token.leaseVersion,kind,...(target?{target}:{}),...(foodId?{foodId}:{})}});}catch(error){showMessage(`操作未执行：${error.message}`);}});
 game.movingGuard=()=>player.held||Boolean(player.sample()?.moving);
-const player=new PlayerController({takeControl:()=>control(true),send:payload=>client.dispatch({kind:'actor.input',payload},{refresh:false}),onRelease:last=>{if(last)actorTimeline.handoff(last,performance.now());},onError:error=>{keys.clear();showMessage(`移动未同步：${error.message}`);}});
+const baizeEncounter=createBaizeEncounter();
+let encounterPending=false,encounterSceneId;
+const player=new PlayerController({onStep:checkBaizeEncounter,takeControl:()=>control(true),send:payload=>client.dispatch({kind:'actor.input',payload},{refresh:false}),onRelease:last=>{if(last)actorTimeline.handoff(last,performance.now());},onError:error=>{baizeEncounter.clearGrass();keys.clear();showMessage(`移动未同步：${error.message}`);}});
+const baizeFollower=createBaizeFollower(scene);
+const baizeBattle=mountBaizeBattle(client,{
+ character:original,
+ playSound:cue=>localSound.playAction(cue),
+ onEnter:showIntro=>{
+  keys.clear();sprintHeld=false;stopOrbit();viewToggle.exitLock();
+  player.release();lease=null;portalPending=false;
+  if(travelAction){travelAction=null;original.stopPreview();}
+  localSound.setMusic('battle');
+  if(showIntro){
+   localSound.playAction('battle-encounter');
+   void teleportEffect.reveal('遇到野生白泽',{encounter:true});
+  }
+ },
+ onExit:()=>{
+  keys.clear();baizeEncounter.afterBattle();baizeFollower.reset();actorTimeline.handoff(actor,performance.now());renderPosition.fromArray(actor.position);
+  playSceneMusic();
+  localSound.playAction('scene-transition');
+  void teleportEffect.reveal(registry.scenes.get(activeScene)?.label??'返回探索');
+ },
+});
+client.onSnapshot(snapshot=>{
+ const next=snapshot.actors.find(a=>a.actorId===actor?.actorId);
+ if(!next)return;
+ if(next.sceneId!==encounterSceneId||next.actionId){
+  encounterSceneId=next.sceneId;
+  baizeEncounter.clearGrass();
+ }
+ baizeBattle.sync(next.battle,next.actorId);
+});
+function checkBaizeEncounter(previous,next,snapshot){
+ if(encounterPending||!baizeFollower.available||!previous.position||client.connectionStatus!=='connected')return;
+ const inForest=snapshot.scenes.find(scene=>scene.sceneId===next.sceneId)?.templateId==='forest_v1';
+ if(baizeEncounter.advance(previous,next,inForest))void requestBaizeBattle(next.actorId);
+}
+async function requestBaizeBattle(actorId){
+ encounterPending=true;
+ const generation=player.generation;
+ keys.clear();
+ player.stop();
+ try{
+  await player.drain();
+  if(player.generation!==generation||!player.lease||!player.ack)return;
+  const {leaseId,leaseVersion}=player.lease;
+  await client.dispatch({kind:'battle.start',payload:{actorId,leaseId,leaseVersion,sequence:player.ack}});
+ }catch(error){
+  if(!['BATTLE_START_UNAVAILABLE','LEASE_INVALID','ACTOR_IN_BATTLE'].includes(error.message))showMessage('遇敌未同步，请继续探索');
+ }finally{
+  baizeEncounter.clearGrass();
+  encounterPending=false;
+ }
+}
 async function action(kind,target,options){
+ if(encounterPending)return;
  try{if(player.active){player.stop();await player.drain();await client.refreshState();const settled=client.snapshot.actors.find(a=>a.actorId===actor.actorId);if(settled)actorTimeline.handoff(settled,performance.now());player.release();}
   return await dispatcher.submit(kind,target,options);
  }catch(error){showMessage(`操作未执行：${error.message}`);}
@@ -313,20 +436,26 @@ const foodPicker=mountFoodPicker({
 game.onFeed=()=>foodPicker.open();
 game.getFurniture=()=>registry.scenes.get(activeScene)?.furniture.children||[];
 const teleportEffect=createTeleportEffect();let teleportPending=false;
-async function teleportToScene(id){
- if(teleportPending||!actor)return false;
- if(id===actor.sceneId)return true;
+async function teleportToScene(id,landmarkId,label){
+ if(teleportPending||encounterPending||!actor)return false;
+ if(client.connectionStatus!=='connected'){showMessage('世界尚未连接，请稍后传送');return false;}
+ if(id===actor.sceneId&&!landmarkId)return true;
  if(dispatcher.busy){showMessage('请等待当前操作完成后传送');return;}
  teleportPending=true;keys.clear();
  try{
   if(editor?.active){await editor.setActive(false);if(editor.active){showMessage('请先保存当前布置再传送');return;}}
   player.stop();await player.drain();player.release();lease=null;
-  await teleportEffect.depart(registry.scenes.get(id)?.label||id);
-  await client.dispatch({kind:'actor.teleport',payload:{actorId:actor.actorId,sceneId:id}});
+  localSound.playAction('scene-transition');
+  await teleportEffect.depart(label||registry.scenes.get(id)?.label||id);
+  await client.dispatch({kind:'actor.teleport',payload:{actorId:actor.actorId,...(id?{sceneId:id}:{templateId:'forest_v1'}),...(landmarkId?{landmarkId}:{})}});
   actorTimeline.handoff(actor,performance.now());renderPosition.fromArray(actor.position);
+  if(landmarkId){
+   baizeEncounter.clearGrass();
+   if(!fpActive&&!thirdActive)iso.follow(renderPosition,0,true);
+  }
   await teleportEffect.arrive();
   return true;
- }catch(error){showMessage(`传送失败：${error.message}`);return false;}
+ }catch(error){showMessage(error.message==='QUOTA_EXCEEDED'?'场景数量已达上限，无法创建森林':`传送失败：${error.message}`);return false;}
  finally{teleportEffect.clear();teleportPending=false;keys.clear();}
 }
 const eventMenu=toolbar.querySelector('#quick-events');
@@ -374,11 +503,64 @@ eventMenu.addEventListener('keydown',event=>{
 const leftRail=document.createElement('div');leftRail.id='left-rail';leftRail.style.cssText='position:fixed;left:24px;top:110px;z-index:30;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 312px);overflow:auto;padding-right:4px';document.body.append(leftRail);
 const scenePicker=document.createElement('nav');scenePicker.setAttribute('aria-label','场景传送');scenePicker.style.cssText='display:grid;gap:7px;background:#faf1e5ed;padding:12px;border:1px solid #fff9;border-radius:16px;font:14px system-ui;min-width:110px';leftRail.append(scenePicker);
 let scenePickerKey='';
+function sceneEntry(node,label,current,disabled=false){
+ node.textContent=label;
+ node.style.cssText=`border:1px solid ${current?'#af8556':'#cbbba8'};background:${current?'#dfc39f':'#fff9ee'};color:#51454a;border-radius:10px;padding:9px 12px;font:inherit;cursor:${disabled?'default':'pointer'}`;
+ if(current)node.setAttribute('aria-current','location');
+}
+function positionForestPicker(){
+ const open=scenePicker.querySelector('.forest-teleport[open]');
+ if(!open)return;
+ const anchor=open.querySelector('summary').getBoundingClientRect();
+ const rail=leftRail.getBoundingClientRect();
+ if(anchor.bottom<=rail.top||anchor.top>=rail.bottom){open.open=false;return;}
+ const box=open.querySelector('.forest-destinations');
+ box.style.left=`${rail.right+7}px`;
+ box.style.top=`${Math.max(8,Math.min(anchor.top,window.innerHeight-box.offsetHeight-8))}px`;
+}
+leftRail.addEventListener('scroll',positionForestPicker);
+window.addEventListener('resize',positionForestPicker);
+document.addEventListener('pointerdown',event=>{
+ const open=scenePicker.querySelector('.forest-teleport[open]');
+ if(open&&!open.contains(event.target))open.open=false;
+});
+scenePicker.addEventListener('keydown',event=>{
+ const open=event.target.closest('.forest-teleport[open]');
+ if(event.key==='Escape'&&open){open.open=false;open.querySelector('summary').focus();}
+});
 function refreshScenePicker(){
  const choices=[...registry.scenes].filter(([,cfg])=>cfg.data.status==='active');
+ if(!choices.some(([,cfg])=>cfg.data.templateId==='forest_v1'))choices.push([null,{data:{templateId:'forest_v1'},label:'森林'}]);
  const key=JSON.stringify([activeScene,choices.map(([id,cfg])=>[id,cfg.label])]);if(key===scenePickerKey)return;scenePickerKey=key;
  scenePicker.replaceChildren();
- for(const [id,cfg]of choices){const current=id===activeScene,button=document.createElement('button');button.type='button';button.textContent=cfg.label;button.setAttribute('aria-current',current?'location':'false');button.disabled=current;button.style.cssText=`border:1px solid ${current?'#af8556':'#cbbba8'};background:${current?'#dfc39f':'#fff9ee'};color:#51454a;border-radius:10px;padding:9px 12px;font:inherit;cursor:${current?'default':'pointer'}`;button.onclick=()=>{keys.clear();void teleportToScene(id);};scenePicker.append(button);}
+ for(const [id,cfg]of choices){
+  const current=id===activeScene;
+  if(cfg.data.templateId==='forest_v1'){
+   const details=document.createElement('details'),summary=document.createElement('summary');
+   details.className='forest-teleport';
+   details.addEventListener('toggle',positionForestPicker);
+   sceneEntry(summary,cfg.label,current);
+   const destinations=document.createElement('div');
+   destinations.className='forest-destinations';
+   destinations.setAttribute('role','group');
+   destinations.setAttribute('aria-label','森林传送点');
+   for(const [landmarkId,label] of [['entrance','入口'],['summit-lake','湖泊']]){
+    const button=document.createElement('button');
+    button.type='button';
+    sceneEntry(button,label,false);
+    button.onclick=()=>{details.open=false;void teleportToScene(id,landmarkId,`${cfg.label} · ${label}`);};
+    destinations.append(button);
+   }
+   details.append(summary,destinations);
+   scenePicker.append(details);
+   continue;
+  }
+  const button=document.createElement('button');
+  button.type='button';button.disabled=current;
+  sceneEntry(button,cfg.label,current,current);
+  button.onclick=()=>{keys.clear();void teleportToScene(id);};
+  scenePicker.append(button);
+ }
 }
 
 const editable=target=>target?.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName);
@@ -395,7 +577,9 @@ window.addEventListener('keydown', event => {
   }
   return;
  }
- const moving=player.held&&player.sample()?.moving&&!actor?.actionId;
+ const motion=player.sample();
+ const airborne=motion?.grounded===false&&!actor.actionId;
+ const moving=player.held&&motion?.moving&&!actor.actionId;
  const sprint=sprintHeld||sprintToggle;
  if(event.code==='KeyF'){
   if(actor.actionId||client.connectionStatus!=='connected'||!original.startRoll({interruptWalking:player.active}))return;
@@ -409,9 +593,10 @@ window.addEventListener('keydown', event => {
   showMessage('跳舞中 · G 重抽 · 方向键停止');
  }else if(event.code==='KeyE'){
   if(actor.actionId||!original.startPunch({interruptWalking:player.active}))return;
- }else if(moving){
-  if(!original.startFlyingKick())return;
-  startTravelAction(sprint?SPRINT_FLYING_KICK_DISTANCE:WALK_FLYING_KICK_DISTANCE,sprint);
+ }else if(moving||airborne){
+  if(!original.startFlyingKick({airborne}))return;
+  const distance=airborne?AIR_FLYING_KICK_DISTANCE:sprint?SPRINT_FLYING_KICK_DISTANCE:WALK_FLYING_KICK_DISTANCE;
+  startTravelAction(distance,airborne||sprint);
  }else if(!original.startKick({interruptWalking:player.active&&!actor?.actionId})){
   return;
  }
@@ -428,7 +613,13 @@ window.addEventListener('keydown',e=>{if(teleportPending||e.repeat||editor?.rese
   return;
  }
  if(e.code==='ControlLeft'||e.code==='ControlRight'||e.code==='KeyC'){
-  if(!editor?.active){
+  const motion=player.sample()??actor;
+  if(!editor?.active&&motion?.form==='swim'){
+   if(e.code==='KeyC'&&motion.grounded!==false&&!settings.isOpen&&!foodPicker.isOpen){
+    diveRequested=!(diveRequested??motion.diving);
+    showMessage(diveRequested?'潜水 · C / 空格浮出':'浮出水面');
+   }
+  }else if(!editor?.active){
    const moving=keys.has('KeyW')||keys.has('KeyA')||keys.has('KeyS')||keys.has('KeyD');
    if(crawling)leaveCrawl();
    else if((sprintHeld||sprintToggle)&&moving)wantSlide=true;
@@ -444,7 +635,10 @@ window.addEventListener('keydown',e=>{if(teleportPending||e.repeat||editor?.rese
  e.preventDefault();
  if(e.code==='Space'){
   if(!editor?.active&&!player.jumpRequested){
-   if(crawling)leaveCrawl();
+   if((diveRequested??(player.sample()??actor)?.diving)===true){
+    diveRequested=false;
+    showMessage('浮出水面');
+   }else if(crawling)leaveCrawl();
    else{
     const sprinting=sprintHeld||sprintToggle;
     const moving=keys.has('KeyW')||keys.has('KeyA')||keys.has('KeyS')||keys.has('KeyD');
@@ -469,7 +663,7 @@ function pauseKeyboardWalking(){
  player.stop();
  player.flush().catch(()=>{});
 }
-function stopMovement(){sprintHeld=false;const moving=keys.size>0;keys.clear();if(moving&&!editor?.active){player.stop();player.flush().catch(()=>{});}}window.addEventListener('blur',stopMovement);document.addEventListener('visibilitychange',()=>{if(document.hidden)stopMovement();});
+function stopMovement(){sprintHeld=false;diveRequested=undefined;const moving=keys.size>0;keys.clear();if(moving&&!editor?.active){player.stop();player.flush().catch(()=>{});}}window.addEventListener('blur',stopMovement);document.addEventListener('visibilitychange',()=>{if(document.hidden)stopMovement();});
 const pointer=new THREE.Vector2();window.addEventListener('pointermove',e=>{pointer.set(e.clientX/window.innerWidth*2-1,-e.clientY/window.innerHeight*2+1);iso.setPointer(pointer.x,pointer.y);});
 const canvas=R.renderer.domElement;
 const spellBar=mountSpellBar({canvas,scene,playSound:cue=>localSound.playAction(cue),startCast:({start,end},release)=>{
@@ -579,7 +773,16 @@ document.addEventListener('pointerlockchange',()=>{
 canvas.addEventListener('wheel',e=>{if(thirdActive){e.preventDefault();tp.zoom(e.deltaY);return;}if(!fpActive)return;e.preventDefault();fp.setFov(fp.fov-Math.sign(e.deltaY)*3);},{passive:false});
 bindCameraWheel(canvas,iso,()=>editor);
 window.addEventListener('resize',()=>{R.resize(window.innerWidth,window.innerHeight);iso.resize();fp.resize(window.innerWidth,window.innerHeight);tp.resize(window.innerWidth,window.innerHeight);});
-function directions(snapshot){const result=[];for(const portal of snapshot.portals){const end=portalEnds(snapshot,portal);if(end.fromSceneId===actor.sceneId)result.push({...end,inwardNormal:portalInwardNormal(snapshot,{...portal,...end})});if(portal.bidirectional&&end.toSceneId===actor.sceneId)result.push({fromSceneId:end.toSceneId,toSceneId:end.fromSceneId,departure:end.landing,landing:end.departure,inwardNormal:portalInwardNormal(snapshot,{...portal,...end},true)});}return result;}
+function directions(snapshot){
+ const result=[];
+ for(const portal of snapshot.portals){
+  const end=portalEnds(snapshot,portal);
+  const isForestGate=[portal.from?.slotId,portal.to?.slotId].includes(YARD_FOREST_SLOT);
+  if(end.fromSceneId===actor.sceneId)result.push({...end,gate:isForestGate,inwardNormal:portalInwardNormal(snapshot,{...portal,...end})});
+  if(portal.bidirectional&&end.toSceneId===actor.sceneId)result.push({fromSceneId:end.toSceneId,toSceneId:end.fromSceneId,departure:end.landing,landing:end.departure,gate:isForestGate,inwardNormal:portalInwardNormal(snapshot,{...portal,...end},true)});
+ }
+ return result;
+}
 function startTravelAction(distance,sprint,{roll=false,heading=original.heading}={}){
  if(!player.active)player.begin(actor,{sceneId:actor.sceneId,position:renderPosition.toArray()});
  travelAction={heading,direction:[Math.sin(heading),Math.cos(heading)],sceneId:actor.sceneId,remaining:distance,sprint,roll,buffered:false};
@@ -594,16 +797,24 @@ function advanceTravelAction(dt,now){
  }
  const speed=PLAYER_SPEED*(action.sprint?2:1);
  const distance=Math.min(action.remaining,speed*dt);
+ let movedFor=0;
  if(distance>0){
   const [x,y,z]=state.position,[dx,dz]=action.direction;
   const end=[x+dx*distance,y,z+dz*distance];
   const air=(state.airHeight||0)+(state.supportHeight||0);
-  if(segmentWalkable(client.snapshot,action.sceneId,state.position,end,air)){
+  const feetY=state.grounded===false?y+(state.airHeight||0):undefined;
+  if(segmentWalkable(client.snapshot,action.sceneId,state.position,end,air,feetY)){
    player.step(client.snapshot,action.direction,distance/speed,false,action.sprint);
+   movedFor=distance/speed;
    action.remaining=Math.max(0,action.remaining-distance);
   }else action.remaining=0;
  }
- if(action.remaining===0)pauseKeyboardWalking();
+ if(player.sample()?.grounded===false){
+  // Keep gravity running even when the kick runs out of distance or hits a wall.
+  const fallTime=dt-movedFor;
+  if(fallTime>1e-6)player.step(client.snapshot,[0,0],fallTime);
+ }
+ if(action.remaining===0&&player.sample()?.grounded!==false)pauseKeyboardWalking();
  else if(now-lastInputAt>=100){lastInputAt=now;player.flush().catch(()=>{});}
  return true;
 }
@@ -620,7 +831,7 @@ function updateKeyboard(dt,now){
   pauseKeyboardWalking();
   return;
  }
- if(!(x||z)&&!player.jumpRequested&&!(now<slideUntil)&&player.sample?.()?.grounded!==false){if(player.active&&player.held){player.stop();player.flush().catch(()=>{});}return;}
+ if(!(x||z)&&!player.jumpRequested&&diveRequested===undefined&&!(now<slideUntil)&&player.sample?.()?.grounded!==false){if(player.active&&player.held){player.stop();player.flush().catch(()=>{});}return;}
  let dx,dz;
  if(thirdActive){
   // 第三人称：WASD 相对镜头（W 前、S 后、A/D 左右平移）
@@ -648,19 +859,25 @@ function updateKeyboard(dt,now){
  const sprinting=(sprintHeld||sprintToggle)&&!crawling&&!whale.boxingActive;
  // Separate two real Space presses even when no simulation frame fell between them.
  if(player.jumpRequested&&player.sample()?.jumpHeld)player.step(client.snapshot,[0,0],0);
- player.step(client.snapshot,[length?dx/length:0,length?dz/length:0],dt,player.jumpRequested,sprinting,crawling,whale.boxingActive);player.jumpRequested=false;
+ const dive=diveRequested;
+ diveRequested=undefined;
+ player.step(client.snapshot,[length?dx/length:0,length?dz/length:0],dt,player.jumpRequested,sprinting,crawling,whale.boxingActive,dive);player.jumpRequested=false;
  const position=player.sample()?.position||actor.position;
- const portal=directions(client.snapshot).find(p=>Math.hypot(position[0]-p.departure[0],position[2]-p.departure[2])<.8&&dx*p.inwardNormal[0]+dz*p.inwardNormal[2]<-1e-6);
+ const portal=directions(client.snapshot).find(p=>reachesKeyboardPortal(p,position,dx,dz));
  if(portal&&now-lastPortalAt>2000){
   lastPortalAt=now;portalPending=true;
   action('move',{sceneId:portal.toSceneId}).then(result=>{if(!result)portalPending=false;}).catch(error=>{portalPending=false;showMessage(error.message);});return;
  }
- if(now-lastInputAt>=100){lastInputAt=now;player.flush().catch(()=>{});}
+ if(dive!==undefined||now-lastInputAt>=100){lastInputAt=now;player.flush().catch(()=>{});}
 }
 let activeComputerDisplay;
 let renderedSpellCast;
 const spellHand=()=>original.bones?.handR?.getWorldPosition(new THREE.Vector3());
-function renderActor(dt,t){if(!actor)return;const local=player.sample();let visual={...(local||actorTimeline.sample(performance.now())||actor)};if(local)visual.maneuver=null;currentPose=visual.pose;const next=visual.form==='swim'?blob:original;if(next!==whale){whale.group.visible=false;whale=next;whale.group.visible=true;game.whale=whale;window.__whale=whale;if(next===blob)localSound.play('pool');fx.splash(new THREE.Vector3(...actor.position));}
+function renderActor(dt,t){if(!actor)return;const local=player.sample();let visual={...(local||actorTimeline.sample(performance.now())||actor)};if(local)visual.maneuver=null;
+ if(forestLighting&&visual.form==='swim'&&!waterAt(client.snapshot,visual)){
+  visual={...visual,form:'normal',pose:visual.grounded===false?'jumping':visual.moving?'walking':'idle',diving:false};
+ }
+ currentPose=visual.pose;const next=visual.form==='swim'?blob:original;if(next!==whale){whale.group.visible=false;whale=next;whale.group.visible=true;game.whale=whale;window.__whale=whale;if(next===blob)localSound.play('pool');fx.splash(new THREE.Vector3(...actor.position));}
  visual.sprint=(local?(sprintHeld||sprintToggle):visual.sprint)&&!crawling&&!whale.boxingActive;
  visual.crawl=crawling;
  visual.runningJump=runningJump;
@@ -686,6 +903,14 @@ function renderActor(dt,t){if(!actor)return;const local=player.sample();let visu
   if(bedPosition)visual={...visual,position:bedPosition.toArray()};
  }
  presentActor(whale,visual,dt,t);
+ if(next===blob){
+  const pool=poolAt(client.snapshot,visual.sceneId,visual.position);
+  const lakeDepth=forestLighting?forestLakeDepth(visual.position[0],visual.position[2]):0;
+  const targetDepth=visual.diving?(lakeDepth?THREE.MathUtils.clamp(lakeDepth-.38,0,1.6):pool?Math.min(.86,.97*pool.scale[1]):.78):0;
+  swimDepth=visual.grounded===false?0:THREE.MathUtils.damp(swimDepth,targetDepth,6,dt);
+  blob.group.position.y-=swimDepth;
+  blob.pos.y-=swimDepth;
+ }else swimDepth=0;
  const display=visual.computerDeskId&&visual.pose==='seated'
   ?registry.entities.get(visual.computerDeskId)?.getObjectByName('computer-display'):null;
  if(activeComputerDisplay!==display){
@@ -713,10 +938,11 @@ function renderActor(dt,t){if(!actor)return;const local=player.sample();let visu
  if(visual.pose==='sleeping'&&Math.floor(t*2)!==Math.floor((t-dt)*2))fx.zzz(renderPosition.clone().add(new THREE.Vector3(.3,.5,0)));
  if(!fpActive&&!thirdActive&&outdoors&&!editor?.active)iso.follow(new THREE.Vector3(visual.position[0],visual.position[1],visual.position[2]),dt);
  whale.group.visible=!fpActive;
+ return visual;
 }
 R.setScene(scene,camera);const clock=new THREE.Clock();let time=0,shadowTick=0;lights.sun.shadow.autoUpdate=false;
 const performanceStats={frames:[],longTasks:0};try{new PerformanceObserver(list=>{performanceStats.longTasks+=list.getEntries().filter(e=>e.duration>100).length;}).observe({entryTypes:['longtask']});}catch{}
-const authorProgress=document.createElement('div');authorProgress.style.cssText='position:fixed;top:110px;right:24px;z-index:25;padding:7px 10px;border-radius:10px;background:#fff9ee;color:#51454a;font:12px system-ui';document.body.append(authorProgress);
+const authorProgress=document.createElement('div');authorProgress.id='author-progress';authorProgress.style.cssText='position:fixed;top:110px;right:24px;z-index:25;padding:7px 10px;border-radius:10px;background:#fff9ee;color:#51454a;font:12px system-ui';document.body.append(authorProgress);
 function updateAuthorProgress(){const cfg=registry.scenes.get(activeScene);authorProgress.hidden=!cfg?.template.progressiveEntities;if(authorProgress.hidden)return;const fixed=cfg.shell?.userData.streaming?.stats,p=cfg.progress;authorProgress.textContent=`完整小镇 · 地形 ${fixed?.resident||0}/185 · 摆设 ${p?.resident||0}/${p?.total||516} · 待加载 ${(fixed?.pending||0)+(p?.pending||0)+localAssetCache.stats.pending}`;}
 function escapePointerTrap(message){
  stopOrbit();
@@ -730,7 +956,7 @@ function frame(){
  if(freezeLog.lastFrameAt){const gap=frameStart-freezeLog.lastFrameAt;if(gap>600)freezeLog.gaps.push({t:Date.now()-freezeLog.startedAt,gap:Math.round(gap),fpActive,locked:document.pointerLockElement===canvas});if(gap>1500&&fpActive){setTimeout(()=>escapePointerTrap('检测到明显卡顿，已退出第一视角以免光标被锁住'),0);}}
  freezeLog.lastFrameAt=frameStart;
  try{
-  const dt=Math.min(.05,clock.getDelta());time+=dt;updateKeyboard(dt,frameStart);updateControlStatus(frameStart);registry.update(dt,time);updateAuthorProgress();renderActor(dt,time);iso.update(dt);if(fpActive){fp.setEye(renderPosition,currentPose);fpShadow.position.set(renderPosition.x,renderPosition.y+0.015,renderPosition.z);if(R.renderPass)R.renderPass.camera=fp.camera;}else if(thirdActive){const isBlob=whale===blob;tp.setBaseDistance(isBlob?6.4:3.6);tp.follow(renderPosition,dt,isBlob?1.9:(currentPose==='sleeping'?0.5:1.15));clampThirdCameraToRoom();if(R.renderPass)R.renderPass.camera=tp.camera;}else if(R.renderPass)R.renderPass.camera=camera;spellBar.update(dt,frameStart,renderedSpellCast,spellHand);fx.update(dt,time);hud.updateBubble(dt,fpActive?fp.camera:camera);R.gradePass.uniforms.uTime.value=time;if(++shadowTick%2===0)lights.sun.shadow.needsUpdate=true;R.composer.render();performanceStats.frames.push(performance.now()-frameStart);if(performanceStats.frames.length>1200)performanceStats.frames.shift();
+  const dt=Math.min(.05,clock.getDelta());if(baizeBattle.active){baizeBattle.render(R.renderer,dt);return;}time+=dt;if(!encounterPending)updateKeyboard(dt,frameStart);updateControlStatus(frameStart);registry.update(dt,time);updateAuthorProgress();const visual=renderActor(dt,time);baizeFollower.update(dt,client.snapshot,visual,renderPosition);iso.update(dt);if(fpActive){fp.setEye(renderPosition,currentPose);fpShadow.position.set(renderPosition.x,renderPosition.y+0.015,renderPosition.z);if(R.renderPass)R.renderPass.camera=fp.camera;}else if(thirdActive){const isBlob=whale===blob;tp.setBaseDistance(isBlob?6.4:3.6);tp.follow(renderPosition,dt,isBlob?1.9:(currentPose==='sleeping'?0.5:1.15));clampThirdCameraToRoom();if(R.renderPass)R.renderPass.camera=tp.camera;}else if(R.renderPass)R.renderPass.camera=camera;spellBar.update(dt,frameStart,renderedSpellCast,spellHand);fx.update(dt,time);hud.updateBubble(dt,fpActive?fp.camera:camera);R.gradePass.uniforms.uTime.value=time;if(++shadowTick%2===0){if(forestLighting)followForestSun();lights.sun.shadow.needsUpdate=true;}R.composer.render();performanceStats.frames.push(performance.now()-frameStart);if(performanceStats.frames.length>1200)performanceStats.frames.shift();
  }catch(error){
   if(!frameErrorAt||performance.now()-frameErrorAt>3000){frameErrorAt=performance.now();console.error('frame loop failed',error);freezeLog.errors.push({t:Date.now()-freezeLog.startedAt,message:String(error?.message||error)});escapePointerTrap('运行出错，已退回等距视角：'+(error?.message||error));}
  }
@@ -767,7 +993,7 @@ window.dafeiyuDesktop?.onRenderSuspended?.(suspended=>{
  updateRenderVisibility();
 });
 document.addEventListener('visibilitychange',updateRenderVisibility);
-async function start(){const session=await ownerSession.ensure();client.csrfToken=session.csrfToken;registerLocalFurniture(await discoverLocalAssets());mountAudioPlayer(client,localSound,settings.muteButton);await client.connect('default');editor=new RoomEditor({group:registry.contexts[activeScene].group,scene,camera,canvas,getScene:()=>activeScene,contexts:registry.contexts,worldClient:client,registry,onOrbit:(dx,dy)=>{if(thirdActive)tp.look(dx,dy);else iso.addDrag(dx*.005);},onToggle:active=>{if(active&&fpActive)setFirstPerson(false);if(active)editor.camera=thirdActive?tp.camera:iso.camera;game.editing=active;stopOrbit();stopMovement();if(player.active){player.stop();player.drain().then(()=>player.release()).catch(()=>{});}keys.clear();if(!active)iso.target.copy(iso.homeTarget);},onChange:()=>yard?.refreshLandscape?.()});toolbar.insertBefore(editor.toggle,toolbar.querySelector('#settings-entry'));editor.setContext(activeScene);window.__editor=editor;mountAuthorExamples({renderActivity,onOpen:()=>{stopMovement();keys.clear();game.editing=true;},onClose:()=>{game.editing=editor.active;}});document.getElementById('loading')?.classList.add('gone');for(const id of ['title','hint','status'])document.getElementById(id)?.classList.add('in');updateControlStatus();}
+async function start(){const session=await ownerSession.ensure();client.csrfToken=session.csrfToken;void baizeFollower.load();registerLocalFurniture(await discoverLocalAssets());mountAudioPlayer(client,localSound,settings.muteButton);await client.connect('default');editor=new RoomEditor({group:registry.contexts[activeScene].group,scene,camera,canvas,getScene:()=>activeScene,contexts:registry.contexts,worldClient:client,registry,onClickSound:confirmClick,onOrbit:(dx,dy)=>{if(thirdActive)tp.look(dx,dy);else iso.addDrag(dx*.005);},onToggle:active=>{if(active&&fpActive)setFirstPerson(false);if(active)editor.camera=thirdActive?tp.camera:iso.camera;game.editing=active;stopOrbit();stopMovement();if(player.active){player.stop();player.drain().then(()=>player.release()).catch(()=>{});}keys.clear();if(!active)iso.target.copy(iso.homeTarget);},onChange:()=>yard?.refreshLandscape?.()});toolbar.insertBefore(editor.toggle,toolbar.querySelector('#settings-entry'));editor.setContext(activeScene);window.__editor=editor;mountAuthorExamples({renderActivity,onOpen:()=>{stopMovement();keys.clear();game.editing=true;},onClose:()=>{game.editing=editor.active;}});document.getElementById('loading')?.classList.add('gone');for(const id of ['title','hint','status'])document.getElementById(id)?.classList.add('in');updateControlStatus();}
 // Loading overlay must never hide the owner pairing dialog or block recovery.
 document.getElementById('loadBar').style.width='100%';document.getElementById('loadText').textContent='正在连接世界';start().catch(error=>{document.getElementById('loading')?.classList.add('gone');showMessage(`连接失败：${error.message} · 请刷新重试`);});
 Object.assign(window,{

@@ -54,6 +54,7 @@ export function presentActor(character,visual,dt,time){
  character.pos.copy(position);character.target.copy(position);character.velocity?.set(0,0,0);
  character.heading=visual.rotation||0;
  character.externalMotion={maneuver:visual.maneuver,moving:['walking','swimming','climbing'].includes(visual.pose)&&!!visual.moving,speed:visual.speed||0,sprint:!!visual.sprint,crawl:!!visual.crawl,treeClimbing:visual.pose==='tree-climbing',climbMotion:visual.climbMotion||0,runningJump:!!visual.runningJump,grounded:visual.grounded!==false,jumping:visual.pose==='jumping'||visual.grounded===false,airHeight:visual.airHeight||0,jumpStage:visual.jumpStage??0,verticalVelocity:visual.verticalVelocity||0};
+ character.externalMotion.platformLanding=visual.sceneId==='yard'&&visual.supportHeight>0;
  character.group.position.copy(position);character.group.rotation.y=character.heading;
  const previousMealTime=character.stateTime;
  character.update(dt,time);

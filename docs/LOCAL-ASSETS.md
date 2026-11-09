@@ -53,3 +53,9 @@ HTTP导入仅接受拥有者网页会话，并校验CSRF和同源请求；普通
 - `resources/polyfork/` 随公开仓库提供，共 146 个 GLB 及从这些 GLB 本机渲染的 WebP 缩略图。模型、缩略图与署名约 22 MiB。逐条署名见 [CREDITS.md](../resources/polyfork/CREDITS.md)，分发许可见 [LICENSE.md](../resources/polyfork/LICENSE.md)。
 - 没有本地素材清单时，服务会加载这份精选库。选了本地库以后，默认场景已经摆进去的精选模型仍由项目提供。精选库由服务按需提供，Vite 不会把它复制到网页构建目录。
 - `.cache/town-assets/` 保存本机全量库，或你在游戏里导入的其他素材。整个目录及导入备份都在 Git 忽略范围内。克隆项目后可用精选库开始游戏，再按需添加自己的素材。
+
+## 白泽伙伴
+
+白泽伙伴和野生白泽共用公开模型 `resources/character/models/baize.glb`，随仓库和桌面版提供。原有本机 `companions/baize.glb` 仍可覆盖内置模型。
+
+进入游戏后，伙伴白泽会随大肥鱼探索。走过森林高草可能遇到野生白泽。对战时点击敌人打开技能菜单，分别为大肥鱼和白泽选择招式。[森林与对战玩法](../README.md#带白泽去森林)

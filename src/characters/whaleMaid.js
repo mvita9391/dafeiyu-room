@@ -362,11 +362,14 @@ export class WhaleMaid {
     return true;
   }
 
-  startFlyingKick() {
-    if (this.state !== 'swim' || this.externalMotion?.jumping || this.externalMotion?.crawl || this.sliding) return false;
+  startFlyingKick({ airborne = false } = {}) {
+    const allowed = airborne ? ['idle', 'swim'].includes(this.state) : this.state === 'swim' && !this.externalMotion?.jumping;
+    if (!allowed || this.externalMotion?.crawl || this.sliding) return false;
     const { name, ...timing } = FLYING_KICK;
     // Blend into locomotion before the clip's final recovery settles.
-    return this.startPreview(name, { ...timing, end: 1.12, loop: false, restart: true, interruptWalking: true });
+    if (!this.startPreview(name, { ...timing, end: 1.12, loop: false, restart: true, interruptWalking: true })) return false;
+    if (airborne) this.previewSoundCues = this.previewSoundCues.filter(([, cue]) => cue !== 'land');
+    return true;
   }
 
   startRoll({ interruptWalking = false } = {}) {
@@ -537,6 +540,7 @@ export class WhaleMaid {
     this.slideEndsAt = 0;
     action.paused = true;
     action.time = Math.min(0.80, action.getClip().duration * 0.33);
+    if (this.externalMotion?.verticalVelocity > 0) this.onActionSound?.('jump-effort');
     return true;
   }
 
@@ -566,6 +570,7 @@ export class WhaleMaid {
     const { airHeight, verticalVelocity } = this.externalMotion;
     this.jumpPeak = airHeight + verticalVelocity ** 2 / (2 * JUMP_GRAVITY);
     action.paused = true;
+    this.onActionSound?.('double-jump-effort');
     return true;
   }
 
@@ -630,7 +635,7 @@ export class WhaleMaid {
         // A late join starts at the current pose and skips cues that already happened.
         this.worldManeuver = { key, time: elapsed <= .12 ? (clip.start ?? -1) : time };
       }
-      const cues = clip.name === 'Slide' ? [[0, 'slide']] : ACTION_SOUND_CUES[clip.name] || [];
+      const cues = ACTION_SOUND_CUES[clip.name] || [];
       for (const [at, cue] of cues) {
         if (at > this.worldManeuver.time && at <= time) this.onActionSound?.(cue);
       }
@@ -652,7 +657,7 @@ export class WhaleMaid {
     this.slideStartedAt = startedAt;
     this.slideEndsAt = endsAt;
     action.paused = true;
-    this.onActionSound?.('slide');
+    for (const [, cue] of ACTION_SOUND_CUES.Slide) this.onActionSound?.(cue);
     return true;
   }
 
@@ -834,8 +839,27 @@ export class WhaleMaid {
       if (this.externalMotion.jumpStage === 2 && (!this.jumping || this.jumpActionName !== 'DoubleJump') && this.actions?.HumanSpBigJump) this.enterSecondJumpClip();
       else if (!this.jumping) this.enterJumpClip();
     }
-    else if (!airborne && this.jumping) { this.jumping = false; const jump = this.actions?.Jump; if (jump) { jump.paused = false; jump.time = 0; } this.onActionSound?.('land'); }
-    if (this.jumping) this.driveJumpClip();
+    else if (!airborne && this.jumping) {
+      this.jumping = false;
+      if (this.externalMotion.platformLanding && this.activeAction && !this.previewAction) {
+        const duration = this.activeAction.getClip().duration;
+        this.activeAction.time = this.jumpActionName === 'DoubleJump'
+          ? BIG_JUMP_FRAMES.land
+          : this.jumpActionName === 'RunningJump' ? duration - .001 : duration * (1.25 / 2.43);
+        this.activeAction.paused = true;
+      } else if (this.actions?.Jump) {
+        this.actions.Jump.paused = false;
+        this.actions.Jump.time = 0;
+      }
+      this.onActionSound?.('land');
+    }
+    if (this.jumping && !this.previewAction) {
+      if (this.currentClip === FLYING_KICK.name) {
+        const action = this.jumpActionName === 'DoubleJump' ? this.secondJumpAction : this.actions?.[this.jumpActionName];
+        this.transitionTo(this.jumpActionName, { action, loop: false, fade: .08 });
+      }
+      this.driveJumpClip();
+    }
     const locomotion = moving ? (sprinting ? 'Sprint' : run ? 'Running' : 'Walking') : 'Idle';
     const maneuverPlaying = this.updateWorldManeuver(this.externalMotion?.maneuver);
     this.updateSlide(locomotion, maneuverPlaying || this.previewAction || this.jumping || crawlPlaying || treeClimbing || ['sit', 'sleep', 'eat'].includes(this.state));

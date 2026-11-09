@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { TRAINING_TARGETS, spellImpact } from '../../shared/world/combat-targets.js';
+import { TRAINING_RANGE, TRAINING_TARGETS, spellImpact } from '../../shared/world/combat-targets.js';
 const wood = new THREE.MeshStandardMaterial({ color: 0x9c663d, roughness: .83 });
 const bands = new THREE.MeshStandardMaterial({ color: 0x53473d, roughness: .89 });
 const base = new THREE.MeshStandardMaterial({ color: 0x877967, roughness: .95 });
@@ -18,6 +18,9 @@ function makeDummy(root, x, z, index) {
   dummy.name = `training-dummy-${index + 1}`;
   dummy.position.set(x, .015, z);
   const pivot = new THREE.Group();
+  const model = new THREE.Group();
+  model.rotation.y = TRAINING_RANGE.rotation;
+  pivot.add(model);
   const material = wood.clone();
   const target = new THREE.MeshStandardMaterial({ color: 0xb55034, roughness: .8 });
   const ring = new THREE.MeshStandardMaterial({ color: 0xf6cc88, roughness: .85 });
@@ -25,14 +28,14 @@ function makeDummy(root, x, z, index) {
   part(pivot, new THREE.CylinderGeometry(.175, .25, 1.46, 9), material, 0, .84, 0);
   part(pivot, new THREE.CylinderGeometry(.181, .186, .10, 9), bands, 0, 1.49, 0);
   part(pivot, new THREE.CylinderGeometry(.24, .246, .12, 9), bands, 0, .27, 0);
-  const arms = part(pivot, new THREE.CylinderGeometry(.07, .07, .86, 8), material, 0, .91, 0);
+  const arms = part(model, new THREE.CylinderGeometry(.07, .07, .86, 8), material, 0, .91, 0);
   arms.rotation.z = Math.PI / 2;
   for (const sign of [-1, 1]) {
-    const plate = part(pivot, new THREE.CylinderGeometry(.24, .24, .085, 16), target, 0, 1.16, sign * .184);
+    const plate = part(model, new THREE.CylinderGeometry(.24, .24, .085, 16), target, 0, 1.16, sign * .184);
     plate.rotation.x = Math.PI / 2;
-    const bullseye = part(pivot, new THREE.TorusGeometry(.145, .021, 6, 18), ring, 0, 1.16, sign * .234);
+    const bullseye = part(model, new THREE.TorusGeometry(.145, .021, 6, 18), ring, 0, 1.16, sign * .234);
     bullseye.castShadow = false;
-    part(pivot, new THREE.SphereGeometry(.047, 8, 6), ring, 0, 1.16, sign * .24);
+    part(model, new THREE.SphereGeometry(.047, 8, 6), ring, 0, 1.16, sign * .24);
   }
   dummy.add(pivot);
   root.add(dummy);
@@ -48,7 +51,9 @@ export function buildYardTraining(group) {
   root.name = 'yard-training-range';
   group.add(root);
   const soil = new THREE.MeshStandardMaterial({ color: 0xad8d62, roughness: 1 });
-  const pad = part(root, new THREE.BoxGeometry(5.5, .022, 1.55), soil, 9.25, .004, .81);
+  const [x,y,z]=TRAINING_RANGE.center;
+  const pad = part(root, new THREE.BoxGeometry(5.5, .022, 1.55), soil, x, y+.004, z);
+  pad.rotation.y=TRAINING_RANGE.rotation;
   pad.castShadow = false;
   const dummies = TRAINING_TARGETS.map(({ position: [x, , z] }, i) => makeDummy(root, x, z, i));
   const numbers = [];

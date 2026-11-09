@@ -42,7 +42,7 @@ export function surfaceAt(template, x, z) {
     ? coastalSurface(x, z)
     : { height: template.groundY, kind: "land" };
 }
-export function surfaceSegment(template, a, b) {
+export function surfaceSegment(template, a, b, airborneFeetY) {
   if (template.templateId !== "coastal_town_v1"&&!template.authorSceneId) return true;
   const n = Math.max(1, Math.ceil(Math.hypot(a[0] - b[0], a[2] - b[2]) / 0.08));
   let prev = surfaceAt(template, a[0], a[2]);
@@ -55,7 +55,9 @@ export function surfaceSegment(template, a, b) {
     );
     if (
       !s ||
-      Math.abs(s.height - prev.height) > (template.maxStepHeight??(template.authorSceneId?.22:.08)) ||
+      (airborneFeetY===undefined
+        ? Math.abs(s.height - prev.height) > (template.maxStepHeight??(template.authorSceneId?.22:.08))
+        : s.height > airborneFeetY + 1e-8) ||
       ((s.kind === "deck") !== (prev.kind === "deck") &&
         (s.kind === "water" || prev.kind === "water"))
     )

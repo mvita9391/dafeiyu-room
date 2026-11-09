@@ -202,6 +202,28 @@ export function spawnElementalCast(spell, start, end, hits = [], hand, playSound
       particles(end, spell.impact, 76, 2.4, '#d4f5ff');
       break;
     }
+    case 'waterJet': {
+      const material = new THREE.MeshPhysicalMaterial({
+        color, emissive: '#12628f', emissiveIntensity: .36, transparent: true,
+        opacity: .78, roughness: .16, clearcoat: .9, depthWrite: false,
+      });
+      const jet = Array.from({ length: 14 }, () => mesh(core, material, launch));
+      updates.push(t => {
+        for (const [i, drop] of jet.entries()) {
+          const k = (t - i * .014) / spell.impact;
+          drop.visible = k >= 0 && k < 1;
+          if (!drop.visible) continue;
+          const wave = Math.sin(k * Math.PI);
+          drop.position.copy(launch).lerp(end, k).addScaledVector(side, .2 * wave * Math.sin(k * 9 + i));
+          drop.position.y += .24 * wave;
+          drop.scale.setScalar((.11 + .22 * (1 - i / jet.length)) * (.8 + wave * .2));
+        }
+      });
+      ring(end, spell.impact, 1.1, '#bceaff');
+      ring(end, spell.impact + .1, 1.55, '#61caff');
+      particles(end, spell.impact, 52, 1.6, '#8bd9ff');
+      break;
+    }
     case 'rift': {
       const count = Math.max(14, Math.ceil(distance * 7));
       const items = Array.from({ length: count }, (_, i) => {
@@ -345,7 +367,7 @@ export function spawnElementalCast(spell, start, end, hits = [], hand, playSound
   let nextHit = 0;
   let playedSpell = false;
   let lastHitSound = -Infinity;
-  const soundTime = spell.id === 'beam' ? spell.impact - .14 : spell.impact;
+  const soundTime = pendingHits[0]?.at ?? spell.impact;
   const update = dt => {
     age += dt;
     updates.forEach(step => step(age));
@@ -355,14 +377,14 @@ export function spawnElementalCast(spell, start, end, hits = [], hand, playSound
     }
     while (nextHit < pendingHits.length && pendingHits[nextHit].at <= age) {
       pendingHits[nextHit++].apply();
-      if (age - lastHitSound >= .11) {
+      if (nextHit > 1 && age - lastHitSound >= .11 && age - soundTime >= .11) {
         playSound?.('spell-wood');
         lastHitSound = age;
       }
     }
     return age < (spell.id === 'crown' ? CROWN_DURATION : 2.05);
   };
-  playSound?.('spell-cast');
+  playSound?.(`spell-${spell.id}-release`);
   update(0);
   return { root, update, dispose() { root.removeFromParent(); for (const resource of owned) resource.dispose(); } };
 }

@@ -12,7 +12,7 @@ import {installStoreScene} from './world/store-feature.js';
 import {installAudio} from './audio/playback.js';
 import Fastify from 'fastify';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, createReadStream } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateWorld } from './storage/migrations.js';
@@ -24,13 +24,22 @@ import {installWorldSocket} from './world/socket.js';
 import {installMcpIntegration} from './integrations/mcp.js';
 import {projectSnapshot} from './mcp/resources.js';
 import {createRuntimeHandlers,WorldRuntime} from './world/runtime.js';
+import {BAIZE_ASSET_URL} from '../shared/world/baize-battle.js';
 import {createBuildHandlers} from './world/build.js';
 
-export async function buildServer({ databasePath, serveStatic = false, logger = false, worldMode = false, resolvePrincipal, worldHandlers = {}, auth = {}, mcpExtensions = {}, mcpAdvancedActions = false, startRuntime = true, localAssetDir, localPackOptions = {} } = {}) {
+export async function buildServer({ databasePath, serveStatic = false, logger = false, worldMode = false, resolvePrincipal, worldHandlers = {}, auth = {}, mcpExtensions = {}, mcpAdvancedActions = false, startRuntime = true, localAssetDir, baizeAssetPath, localPackOptions = {} } = {}) {
   const root=fileURLToPath(new URL('../',import.meta.url));
   const defaultAssetDirs=databasePath===':memory:'?[]:[process.env.WORLD_LOCAL_ASSET_DIR,path.join(root,'.cache/town-assets')].filter(Boolean);
   const assetDirectory=localAssetDir!==undefined?localAssetDir:(defaultAssetDirs.find(dir=>existsSync(path.join(dir,'manifest.json')))||defaultAssetDirs[0]||null);
   const filename=databasePath || path.join(root,'data','game.sqlite');
+  const companionDirectory=path.join(assetDirectory?path.dirname(assetDirectory):path.join(root,'.cache'),'companions');
+  const bundledBaize='resources/character/models/baize.glb';
+  const companionPath=baizeAssetPath??[
+    ...(filename!==':memory:'?[path.join(companionDirectory,'baize.glb')]:[]),
+    path.join(root,bundledBaize),
+    path.join(root,'dist',bundledBaize),
+  ].find(file=>existsSync(file));
+  const baizeEnabled=Boolean(companionPath&&existsSync(companionPath));
   if(filename!==':memory:')mkdirSync(path.dirname(filename),{recursive:true});
   const db=new DatabaseSync(filename);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS layouts (id TEXT PRIMARY KEY, layout TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL)');
@@ -59,7 +68,7 @@ export async function buildServer({ databasePath, serveStatic = false, logger = 
   }
   if(worldMode)migrateWorld(db);
   const migrated=Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='worlds'").get() && db.prepare('SELECT 1 FROM worlds LIMIT 1').get());
-  const worldService=migrated?new WorldService(db,{handlers:{...createRuntimeHandlers(),...createBuildHandlers(),...worldHandlers},memoryPosition:filename!==':memory:'}):null;
+  const worldService=migrated?new WorldService(db,{handlers:{...createRuntimeHandlers({baizeEnabled}),...createBuildHandlers(),...worldHandlers},memoryPosition:filename!==':memory:'}):null;
   worldService?.startMemoryRuntime();
   if(worldMode&&worldService){installStoreScene(worldService);installStoreLights(worldService);installStreetHomeEntrance(worldService);installAuthorBeach(worldService,localManifest);relocateStreetExits(worldService);}
   const app=Fastify({logger,bodyLimit:6*1024*1024});
@@ -126,6 +135,13 @@ export async function buildServer({ databasePath, serveStatic = false, logger = 
   if(worldService){
     const principal=async req=>resolvePrincipal?await resolvePrincipal(req):authService.resolvePrincipal(req);
     const failure=(reply,error)=>reply.code(error.message==='CSRF_REQUIRED'?403:error.message==='UNAUTHORIZED'?401:error.message==='WORLD_NOT_FOUND'?404:400).send({error:error.message,...(error.details?{details:error.details}:{})});
+    app.get(BAIZE_ASSET_URL,async(req,reply)=>{
+      try{
+        if((await principal(req)).role!=='owner')throw Error('UNAUTHORIZED');
+        if(!companionPath||!existsSync(companionPath))return reply.code(404).send({error:'COMPANION_UNAVAILABLE'});
+        return reply.type('model/gltf-binary').header('cache-control','private, max-age=3600').send(createReadStream(companionPath));
+      }catch(error){return failure(reply,error);}
+    });
     app.get('/api/world/:id/snapshot',async(req,reply)=>{try{const p=await principal(req);const snapshot=worldService.getSnapshot(p,req.params.id);/* 两个读取都是同步的，单线程下不会插入写入，cursor 与快照一致 */return {...projectSnapshot(snapshot,p),cursor:worldService.latestCursor(p,req.params.id)};}catch(error){return failure(reply,error);}});
     app.get('/api/world/:id/state',async(req,reply)=>{try{const p=await principal(req);const s=projectSnapshot(worldService.getSnapshot(p,req.params.id),p);const liveActions=Object.fromEntries(Object.entries(s.actions||{}).filter(([,action])=>['running','queued'].includes(action.status)));return {worldId:s.worldId,layoutRevision:s.layoutRevision,topologyRevision:s.topologyRevision,actors:s.actors,actions:liveActions};}catch(error){return failure(reply,error);}});
     app.get('/api/world/:id/events',async(req,reply)=>{try{const principalValue=await principal(req);const after=req.query.after;const afterCursor=after==='latest'?worldService.latestCursor(principalValue,req.params.id):Number(after??0);return worldService.getEvents(principalValue,{worldId:req.params.id,afterCursor,limit:Number(req.query.limit??100)});}catch(error){return failure(reply,error);}});

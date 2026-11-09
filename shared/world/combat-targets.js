@@ -1,6 +1,11 @@
-export const TRAINING_TARGETS = [[7.4,.8],[9.25,.8],[11.1,.8]].map(([x,z],index)=>({
- targetId:`yard-dummy-${index+1}`,sceneId:'yard',name:`${index+1} 号训练木桩`,position:[x,0,z],
-}));
+export const TRAINING_RANGE = {center:[18.7,0,.8],rotation:Math.PI/2};
+export const TRAINING_TARGETS = [-1.85,0,1.85].map((offset,index)=>{
+ const {center:[x,y,z],rotation}=TRAINING_RANGE;
+ return {
+  targetId:`yard-dummy-${index+1}`,sceneId:'yard',name:`${index+1} 号训练木桩`,
+  position:[x+Math.cos(rotation)*offset,y,z-Math.sin(rotation)*offset],
+ };
+});
 
 export function combatTargets(snapshot,sceneId){
  return TRAINING_TARGETS.filter(target=>(!sceneId||target.sceneId===sceneId)

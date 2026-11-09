@@ -2,6 +2,8 @@ import {surfaceAt,surfaceSegment,COASTAL_LOW_OBSTACLES} from './coastal.js';
 import {STREET_HOME} from './street-home.js';
 import {getTemplate} from './templates.js';
 import {getCatalogEntry} from './catalog.js';
+import {PICNIC_SURFACES,UMBRELLA_RADIUS,yardPlatformAt} from './yard-platforms.js';
+import {FOREST_CROSSINGS,FOREST_RIDGES,FOREST_STAIRS} from './forest.js';
 
 // A layout owns this index; runtime movement reuses the same entity array without
 // cloning catalog entries for every A* edge or keyboard substep.
@@ -9,7 +11,7 @@ const collisionIndexes=new WeakMap();
 export function invalidateNavigationCache(snapshot){collisionIndexes.delete(snapshot.entities);}
 function collisionCandidates(snapshot,sceneId,a,b=a){
  let index=collisionIndexes.get(snapshot.entities);if(!index||index.revision!==snapshot.layoutRevision||index.count!==snapshot.entities.length){
-  const cells=new Map();for(const e of snapshot.entities){const f=getCatalogEntry(e.type).footprint;if(!f.blocking||e.type==='yardPool'||e.supportEntityId)continue;const c=Math.cos(e.rotation),s=Math.sin(e.rotation),w=f.width*e.scale[0]/2+.18,d=f.depth*e.scale[2]/2+.18,rx=Math.abs(c)*w+Math.abs(s)*d,rz=Math.abs(s)*w+Math.abs(c)*d,record={entity:e,c,s,half:[w,d]};for(let x=Math.floor((e.position[0]-rx)/8);x<=Math.floor((e.position[0]+rx)/8);x++)for(let z=Math.floor((e.position[2]-rz)/8);z<=Math.floor((e.position[2]+rz)/8);z++){const key=`${e.sceneId}:${x},${z}`;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(record);}}
+  const cells=new Map();for(const e of snapshot.entities){const f=getCatalogEntry(e.type).footprint;if(!f.blocking||e.type==='yardPool'||e.supportEntityId)continue;const c=Math.cos(e.rotation),s=Math.sin(e.rotation),w=(e.type==='yardUmbrella'?.30:f.width/2)*e.scale[0]+.18,d=(e.type==='yardUmbrella'?.30:f.depth/2)*e.scale[2]+.18,reach=e.type==='yardUmbrella'?UMBRELLA_RADIUS*Math.max(e.scale[0],e.scale[2]):0,rx=Math.max(reach,Math.abs(c)*w+Math.abs(s)*d),rz=Math.max(reach,Math.abs(s)*w+Math.abs(c)*d),record={entity:e,c,s,half:[w,d]};for(let x=Math.floor((e.position[0]-rx)/8);x<=Math.floor((e.position[0]+rx)/8);x++)for(let z=Math.floor((e.position[2]-rz)/8);z<=Math.floor((e.position[2]+rz)/8);z++){const key=`${e.sceneId}:${x},${z}`;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(record);}}
   index={cells,revision:snapshot.layoutRevision,count:snapshot.entities.length};collisionIndexes.set(snapshot.entities,index);
  }
  const found=new Set();for(let x=Math.floor(Math.min(a[0],b[0])/8);x<=Math.floor(Math.max(a[0],b[0])/8);x++)for(let z=Math.floor(Math.min(a[2],b[2])/8);z<=Math.floor(Math.max(a[2],b[2])/8);z++)for(const r of index.cells.get(`${sceneId}:${x},${z}`)||[])found.add(r);return [...found];
@@ -17,25 +19,79 @@ function collisionCandidates(snapshot,sceneId,a,b=a){
 
 export const distance=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 export function anchor(entity,id){const a=getCatalogEntry(entity.type).anchors.find(a=>a.anchorId===id);if(!a)throw Error('ANCHOR_NOT_FOUND');const [x,y,z]=a.position.map((v,i)=>v*entity.scale[i]);const c=Math.cos(entity.rotation),s=Math.sin(entity.rotation);return [entity.position[0]+x*c+z*s,entity.position[1]+y,entity.position[2]-x*s+z*c];}
-export function walkable(snapshot,sceneId,p,airHeight=0){const scene=snapshot.scenes.find(s=>s.sceneId===sceneId);if(!scene)throw Error('SCENE_NOT_FOUND');const t=getTemplate(scene.templateId),b=t.bounds;airHeight=Math.max(airHeight,p[1]-(surfaceAt(t,p[0],p[2])?.height??p[1]));if(!surfaceAt(t,p[0],p[2]))return false;if(t.templateId==='coastal_town_v1'&&COASTAL_LOW_OBSTACLES.some(r=>airHeight<r.height+.02&&p[0]>r.x0-.18&&p[0]<r.x1+.18&&p[2]>r.z0-.18&&p[2]<r.z1+.18))return false;if((t.staticColliders||[]).some(r=>p[0]>r.x0-.18&&p[0]<r.x1+.18&&p[2]>r.z0-.18&&p[2]<r.z1+.18))return false;if(p[0]<b.x0+.15||p[0]>b.x1-.15||p[2]<b.z0+.15||p[2]>b.z1-.15)return false;return !collisionCandidates(snapshot,sceneId,p).some(({entity:e,c,s,half})=>{const dx=p[0]-e.position[0],dz=p[2]-e.position[2];return Math.abs(dx*c-dz*s)<half[0]&&Math.abs(dx*s+dz*c)<half[1];});}
+function localPoint({entity,c,s},point){
+ const x=point[0]-entity.position[0],z=point[2]-entity.position[2];
+ return [x*c-z*s,x*s+z*c];
+}
+function insideFurniture(record,point){
+ const [x,z]=localPoint(record,point);
+ return Math.abs(x)<record.half[0]&&Math.abs(z)<record.half[1];
+}
+function clearsYardFurniture({entity},feetY){
+ const clearance=entity.type==='yardPicnicTable'?.72:entity.type==='yardUmbrella'?.12:Infinity;
+ return feetY>=entity.position[1]+clearance*entity.scale[1];
+}
+export function yardSupportAt(snapshot,sceneId,position,maxY=Infinity){
+ let height;
+ for(const record of collisionCandidates(snapshot,sceneId,position)){
+  const {entity}=record;
+  if(entity.type!=='yardPicnicTable'&&entity.type!=='yardUmbrella')continue;
+  const y=yardPlatformAt(entity,...localPoint(record,position));
+  if(y!==undefined&&y<=maxY&&(height===undefined||y>height))height=y;
+ }
+ return height;
+}
+export function walkable(snapshot,sceneId,p,airHeight=0,ignored){
+ const scene=snapshot.scenes.find(s=>s.sceneId===sceneId);
+ if(!scene)throw Error('SCENE_NOT_FOUND');
+ const t=getTemplate(scene.templateId),b=t.bounds,floor=surfaceAt(t,p[0],p[2]);
+ if(!floor)return false;
+ airHeight=Math.max(airHeight,p[1]-floor.height);
+ if(t.templateId==='coastal_town_v1'&&COASTAL_LOW_OBSTACLES.some(r=>airHeight<r.height+.02&&p[0]>r.x0-.18&&p[0]<r.x1+.18&&p[2]>r.z0-.18&&p[2]<r.z1+.18))return false;
+ if((t.staticColliders||[]).some(r=>p[0]>r.x0-.18&&p[0]<r.x1+.18&&p[2]>r.z0-.18&&p[2]<r.z1+.18))return false;
+ if(p[0]<b.x0+.15||p[0]>b.x1-.15||p[2]<b.z0+.15||p[2]>b.z1-.15)return false;
+ return !collisionCandidates(snapshot,sceneId,p).some(record=>!ignored?.has(record)&&
+  !clearsYardFurniture(record,floor.height+airHeight)&&insideFurniture(record,p));
+}
+function intersectsFurniture(a,b,half){
+ let lo=0,hi=1;
+ for(let axis=0;axis<2;axis++){
+  const delta=b[axis]-a[axis],extent=half[axis]-1e-10;
+  if(Math.abs(delta)<1e-12){if(Math.abs(a[axis])>=extent)return false;continue;}
+  const t0=(-extent-a[axis])/delta,t1=(extent-a[axis])/delta;
+  lo=Math.max(lo,Math.min(t0,t1));hi=Math.min(hi,Math.max(t0,t1));
+  if(lo>hi)return false;
+ }
+ return lo<=hi;
+}
+
 // Exact slab intersection against every inflated, rotated furniture rectangle.
-export function segmentWalkable(snapshot,sceneId,start,end,airHeight=0){
- const t=getTemplate(snapshot.scenes.find(s=>s.sceneId===sceneId).templateId);airHeight=Math.max(airHeight,start[1]-(surfaceAt(t,start[0],start[2])?.height??start[1]),end[1]-(surfaceAt(t,end[0],end[2])?.height??end[1]));
- if(!walkable(snapshot,sceneId,start,airHeight)||!walkable(snapshot,sceneId,end,airHeight))return false;
+export function segmentWalkable(snapshot,sceneId,start,end,airHeight=0,airborneFeetY,manualYard=false){
  const template=getTemplate(snapshot.scenes.find(s=>s.sceneId===sceneId).templateId);
- if(!surfaceSegment(template,start,end))return false;if(template.templateId==='coastal_town_v1'&&COASTAL_LOW_OBSTACLES.some(r=>airHeight<r.height+.02&&segmentHitsRect(start,end,r)))return false;
+ const startFloor=surfaceAt(template,start[0],start[2])?.height??start[1];
+ airHeight=Math.max(airHeight,start[1]-startFloor,end[1]-(surfaceAt(template,end[0],end[2])?.height??end[1]));
+ const candidates=collisionCandidates(snapshot,sceneId,start,end);
+ const ignored=manualYard?new Set(candidates.filter(record=>record.entity.type==='yardPicnicTable')):undefined;
+ if(!walkable(snapshot,sceneId,start,airHeight,ignored)||!walkable(snapshot,sceneId,end,airHeight,ignored))return false;
+ if(!surfaceSegment(template,start,end,airborneFeetY))return false;
+ if(template.templateId==='coastal_town_v1'&&COASTAL_LOW_OBSTACLES.some(r=>airHeight<r.height+.02&&segmentHitsRect(start,end,r)))return false;
  if((template.staticColliders||[]).some(r=>segmentHitsRect(start,end,r)))return false;
- return !collisionCandidates(snapshot,sceneId,start,end).some(({entity,c,s,half})=>{
-  const local=p=>{const x=p[0]-entity.position[0],z=p[2]-entity.position[2];return [x*c-z*s,x*s+z*c];};
-  const a=local(start),b=local(end);
-  let lo=0,hi=1;
-  for(let axis=0;axis<2;axis++){
-   const delta=b[axis]-a[axis],extent=half[axis]-1e-10;
-   if(Math.abs(delta)<1e-12){if(Math.abs(a[axis])>=extent)return false;continue;}
-   const t0=(-extent-a[axis])/delta,t1=(extent-a[axis])/delta;
-   lo=Math.max(lo,Math.min(t0,t1));hi=Math.min(hi,Math.max(t0,t1));if(lo>hi)return false;
+ return !candidates.some(record=>{
+  const feetY=startFloor+airHeight;
+  if(clearsYardFurniture(record,feetY))return false;
+  const a=localPoint(record,start),b=localPoint(record,end);
+  if(ignored?.has(record)){
+   const {entity}=record,[sx,sy,sz]=entity.scale;
+   return PICNIC_SURFACES.some(part=>{
+    if(feetY>=entity.position[1]+(part.y-.085)*sy)return false;
+    const az=a[1]-part.z*sz,bz=b[1]-part.z*sz;
+    const half=[part.halfX*sx+.10,part.halfZ*sz+.08];
+    // Let a character that landed in a narrow gap move back out.
+    if(Math.abs(a[0])<half[0]&&Math.abs(az)<half[1])return false;
+    return intersectsFurniture([a[0],az],[b[0],bz],half);
+   });
   }
-  return lo<=hi;
+  return intersectsFurniture(a,b,record.half);
  });
 }
 export function findPath(snapshot,sceneId,start,goal){
@@ -55,6 +111,17 @@ export function findPath(snapshot,sceneId,start,goal){
 
  // Keyboard steering must not snap to A* grid nodes when the direct edge is clear.
  if(segmentWalkable(snapshot,sceneId,start,goal))return [goal.slice()];
+ // Try the marked trails first so long routes through the forest stay interactive.
+ if(terrain.templateId==='forest_v1'){
+  const crossing=x=>FOREST_CROSSINGS[FOREST_RIDGES.filter(ridge=>x>=ridge).length];
+  const from=crossing(start[0]),to=crossing(goal[0]);
+  const trails=FOREST_STAIRS.map(z=>[[from,start[2]],[from,z],[to,z],[to,goal[2]]]
+   .map(([x,z])=>[x,surfaceAt(terrain,x,z)?.height??0,z]).concat([goal.slice()]));
+  const length=path=>path.reduce((total,p,i)=>total+distance(p,path[i-1]||start),0);
+  for(const trail of trails.sort((a,b)=>length(a)-length(b))){
+   if(trail.every((point,i)=>segmentWalkable(snapshot,sceneId,trail[i-1]||start,point)))return trail;
+  }
+ }
  const step=.25,key=p=>`${p[0]},${p[1]}`,point=p=>[p[0]*step,surfaceAt(terrain,p[0]*step,p[1]*step)?.height??0,p[1]*step];
  const a=[Math.round(start[0]/step),Math.round(start[2]/step)],b=[Math.round(goal[0]/step),Math.round(goal[2]/step)],open=[],cost=new Map(),prev=new Map();
  // Attach the exact start only through collision-free edges, including off-grid starts.

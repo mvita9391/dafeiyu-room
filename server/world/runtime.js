@@ -1,15 +1,18 @@
+import {resolveBaizeTurn} from '../../shared/world/baize-battle.js';
+import {startBaizeEncounter,baizeHandlers} from './baize.js';
 import {combatTargets,spellImpact} from '../../shared/world/combat-targets.js';
 import {SPELLS} from '../../shared/world/spells.js';
 import {planAttack} from './combat-plan.js';
 import {recordCheckpoint} from './checkpoints.js';
 import {advanceManeuver,startManeuver} from './maneuvers.js';
 import {PLAYER_SPEED} from '../../shared/world/movement.js';
+import {WORLD_LIMITS} from '../../shared/world/policies.js';
 import {NO_RUNTIME_CHANGE} from './service.js';
 import {surfaceAt} from '../../shared/world/coastal.js';
 import {waterPose} from '../../shared/world/water.js';
 import {TREE_CLIMB_TICKS,treeClimbPose} from '../../shared/world/tree-climb.js';
 import {slidePoint,slideApproach} from '../../shared/world/slide-path.js';
-import {advancePlayer,simulateJump,inputSpeedScale} from '../../shared/world/movement.js';
+import {advancePlayer,canStartJump,simulateJump,inputSpeedScale} from '../../shared/world/movement.js';
 import {advanceNeeds} from './needs.js';
 import {randomUUID} from 'node:crypto';
 import {getTemplate} from '../../shared/world/templates.js';import {getCatalogEntry} from '../../shared/world/catalog.js';
@@ -90,7 +93,7 @@ function submit(ctx){const {snapshot:s,command,principal,now,emit}=ctx;init(s);c
  if(p.kind==='computer'){
   computerDesk=nearbyComputer(s,entity);
   if(!computerDesk)throw Error('COMPUTER_UNAVAILABLE');
- }}if(p.kind==='jump'){if(target?.sceneId&&target.sceneId!==a.sceneId)throw Error('JUMP_TARGET_INVALID');if(target?.landmarkId){const l=getTemplate(s.scenes.find(x=>x.sceneId===a.sceneId).templateId).landmarks?.find(l=>l.landmarkId===target.landmarkId);if(!l)throw Error('LANDMARK_NOT_FOUND');target={sceneId:a.sceneId,position:l.position};}if(a.grounded===false||a.form==='swim')throw Error('JUMP_UNAVAILABLE');const end=target?.groundPosition?[target.groundPosition[0],a.position[1],target.groundPosition[1]]:target?.position||a.position;const jump=simulateJump(s,a,end);const action={actionId:randomUUID(),subjectId:principal.subjectId,actorId:a.actorId,kind:'jump',status:'running',phase:'jumping',leaseId:p.leaseId,leaseVersion:p.leaseVersion,jumpStart:[...a.position],jumpEnd:[...end],jumpDirection:jump.direction,jumpSpeedScale:jump.speedScale,elapsed:0};s.actions[action.actionId]=action;a.actionId=action.actionId;emit('action.started',{actorId:a.actorId,actionId:action.actionId,kind:'jump'});return {actionId:action.actionId,status:'running',phase:'jumping'};}if(!['move','eat'].includes(p.kind)&&!entity)throw Error('ACTION_TARGET_REQUIRED');if(target?.groundPosition){const [x,z]=target.groundPosition;target={sceneId,position:[x,surfaceAt(getTemplate(s.scenes.find(x=>x.sceneId===sceneId).templateId),x,z)?.height??0,z]};}if(target?.landmarkId){const point=getTemplate(s.scenes.find(x=>x.sceneId===sceneId).templateId).landmarks?.find(l=>l.landmarkId===target.landmarkId);if(!point)throw Error('LANDMARK_NOT_FOUND');target={sceneId,position:point.position};}let goal=entity?anchor(entity,p.kind==='move'?target.anchorId:'approach'):target?.position||(p.kind==='eat'?[a.position[0],0,a.position[2]]:getTemplate(s.scenes.find(x=>x.sceneId===sceneId)?.templateId).spawn);
+ }}if(p.kind==='jump'){if(target?.sceneId&&target.sceneId!==a.sceneId)throw Error('JUMP_TARGET_INVALID');if(target?.landmarkId){const l=getTemplate(s.scenes.find(x=>x.sceneId===a.sceneId).templateId).landmarks?.find(l=>l.landmarkId===target.landmarkId);if(!l)throw Error('LANDMARK_NOT_FOUND');target={sceneId:a.sceneId,position:l.position};}if(!canStartJump(s,a))throw Error('JUMP_UNAVAILABLE');const end=target?.groundPosition?[target.groundPosition[0],a.position[1],target.groundPosition[1]]:target?.position||a.position;const jump=simulateJump(s,a,end);const action={actionId:randomUUID(),subjectId:principal.subjectId,actorId:a.actorId,kind:'jump',status:'running',phase:'jumping',leaseId:p.leaseId,leaseVersion:p.leaseVersion,jumpStart:[...a.position],jumpEnd:[...end],jumpDirection:jump.direction,jumpSpeedScale:jump.speedScale,secondJumpAt:jump.secondJumpAt,elapsed:0};s.actions[action.actionId]=action;a.actionId=action.actionId;emit('action.started',{actorId:a.actorId,actionId:action.actionId,kind:'jump'});return {actionId:action.actionId,status:'running',phase:'jumping'};}if(!['move','eat'].includes(p.kind)&&!entity)throw Error('ACTION_TARGET_REQUIRED');if(target?.groundPosition){const [x,z]=target.groundPosition;target={sceneId,position:[x,surfaceAt(getTemplate(s.scenes.find(x=>x.sceneId===sceneId).templateId),x,z)?.height??0,z]};}if(target?.landmarkId){const point=getTemplate(s.scenes.find(x=>x.sceneId===sceneId).templateId).landmarks?.find(l=>l.landmarkId===target.landmarkId);if(!point)throw Error('LANDMARK_NOT_FOUND');target={sceneId,position:point.position};}let goal=entity?anchor(entity,p.kind==='move'?target.anchorId:'approach'):target?.position||(p.kind==='eat'?[a.position[0],0,a.position[2]]:getTemplate(s.scenes.find(x=>x.sceneId===sceneId)?.templateId).spawn);
  if(!entity&&!target?.position)goal=nearestFree(s,sceneId,goal);
  const portals=sceneRoute(s,a.sceneId,sceneId),legs=[];let current=a.sceneId,start=a.position;for(const portal of portals){legs.push({sceneId:current,path:findPath(s,current,start,portal.departure),portal});current=portal.toSceneId;start=portal.landing;}if(p.kind==='move'&&!entity&&!target?.position&&portals.length)goal=nearestFree(s,sceneId,start);let finalPath;
  if(entity&&p.kind!=='move'){
@@ -217,7 +220,10 @@ function playerInput(ctx){
  // 保证同一时间只有一个动作生效，且走动一定接管。
  if(a.actionId){const active=s.actions[a.actionId];if(active&&!terminal.has(active.status))finish(s,a,active,'cancelled',emit,'walk_priority');else a.actionId=null;}
  leaveSeat(s,a);
- for(const frame of frames){const next=advancePlayer(s,a,frame.direction,frame.dtMs,frame.jump,inputSpeedScale(frame));Object.assign(a,{position:next.position,rotation:next.rotation,pose:next.pose,form:next.form,grounded:next.grounded,verticalVelocity:next.verticalVelocity,airHeight:next.airHeight,jumpStage:next.jumpStage,jumpHeld:next.jumpHeld,supportHeight:next.supportHeight});}
+ for(const frame of frames){
+  const next=advancePlayer(s,a,frame.direction,frame.dtMs,frame.jump,inputSpeedScale(frame),frame.dive);
+  Object.assign(a,{position:next.position,rotation:next.rotation,pose:next.pose,form:next.form,grounded:next.grounded,verticalVelocity:next.verticalVelocity,airHeight:next.airHeight,jumpStage:next.jumpStage,jumpHeld:next.jumpHeld,supportHeight:next.supportHeight,diving:next.diving});
+ }
  a.controller.expiresAt=now+OWNER_LEASE_MS;
  a.input={leaseId:p.leaseId,sequence,lastAt:now,budgetMs:budget-total};
  return {actor:structuredClone(a)};
@@ -225,27 +231,51 @@ function playerInput(ctx){
 function teleport(ctx){
  const {snapshot:s,command,principal,emit}=ctx;
  if(principal.role!=='owner')throw Error('UNAUTHORIZED');
- const destination=s.scenes.find(scene=>scene.sceneId===command.payload.sceneId&&scene.status==='active');
- if(!destination)throw Error('SCENE_NOT_FOUND');
- const template=getTemplate(destination.templateId),source=actorOf(s,command.payload.actorId);
+ const {actorId,sceneId,templateId,landmarkId}=command.payload;
+ const a=actorOf(s,actorId);
+ let destination=s.scenes.find(scene=>scene.status==='active'&&(templateId?scene.templateId===templateId:scene.sceneId===sceneId));
+ if(!destination&&!templateId)throw Error('SCENE_NOT_FOUND');
+ const template=getTemplate(destination?.templateId??templateId);
+ const landmark=landmarkId&&template.landmarks?.find(item=>item.landmarkId===landmarkId);
+ if(landmarkId&&!landmark)throw Error('LANDMARK_NOT_FOUND');
+ if(!destination){
+  destination=s.scenes.find(scene=>scene.templateId===templateId);
+  if(!destination){
+   if(s.scenes.length>=WORLD_LIMITS.scenes)throw Error('QUOTA_EXCEEDED');
+   destination={sceneId:randomUUID(),templateId,name:'森林',style:'natural',status:'active'};
+   s.scenes.push(destination);
+   (s.features??={}).quickTravelForestId=destination.sceneId;
+  }
+  destination.status='active';
+  s.layoutRevision++;s.topologyRevision++;
+  emit('world.feature_installed',{feature:'forestV1',sceneId:destination.sceneId});
+ }
  let entry;
- try{entry=sceneRoute(s,source.sceneId,destination.sceneId).at(-1)?.landing;}catch{}
- if(!entry){for(const portal of s.portals){const ends=portalEnds(s,portal);if(ends.toSceneId===destination.sceneId){entry=ends.landing;break;}if(portal.bidirectional&&ends.fromSceneId===destination.sceneId){entry=ends.departure;break;}}}
- const position=nearestFree(s,destination.sceneId,entry||template.portalSlots?.[0]?.landing||template.spawn);
- const a=actorOf(s,command.payload.actorId);
+ if(!landmark){
+  try{entry=sceneRoute(s,a.sceneId,destination.sceneId).at(-1)?.landing;}catch{}
+  if(!entry){for(const portal of s.portals){const ends=portalEnds(s,portal);if(ends.toSceneId===destination.sceneId){entry=ends.landing;break;}if(portal.bidirectional&&ends.fromSceneId===destination.sceneId){entry=ends.departure;break;}}}
+ }
+ const position=nearestFree(s,destination.sceneId,landmark?.position||entry||template.portalSlots?.[0]?.landing||template.spawn);
  if(a.actionId)finish(s,a,s.actions[a.actionId],'cancelled',emit,'teleport');
  a.resting=null;delete a.computerDeskId;a.controller=null;a.input=null;a.actionId=null;a.sceneId=destination.sceneId;a.position=[...position];
  const height=surfaceAt(template,position[0],position[2])?.height??position[1];
- a.position[1]=height;Object.assign(a,{pose:'idle',form:'normal',moving:false,speed:0,grounded:true,verticalVelocity:0,airHeight:0,jumpStage:0,jumpHeld:false,supportHeight:0});
+ a.position[1]=height;Object.assign(a,{pose:'idle',form:'normal',moving:false,speed:0,grounded:true,verticalVelocity:0,airHeight:0,jumpStage:0,jumpHeld:false,supportHeight:0,diving:false});
  Object.assign(a,waterPose(s,a));emit('actor.teleported',{actorId:a.actorId,sceneId:a.sceneId,position:[...a.position]});
  return {sceneId:a.sceneId,position:[...a.position]};
 }
-export function createRuntimeHandlers(){return {'actor.teleport':teleport,'actor.input':playerInput,'control.acquire':ctx=>lease(ctx),'control.takeover':ctx=>lease(ctx,true),'control.renew':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);a.controller.expiresAt=ctx.now+leaseDuration(ctx.principal);return {...a.controller};},'control.release':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);if(a.actionId)finish(ctx.snapshot,a,ctx.snapshot.actions[a.actionId],'cancelled',ctx.emit,'control_release');a.controller=null;ctx.emit('control.released',{actorId:a.actorId});return {status:'released'};},'action.submit':submit,'action.task':startTask,'action.cancel':cancelAction};}
+function startBattle(ctx,enabled){
+ const {snapshot,command,principal,now}=ctx;
+ const actor=actorOf(snapshot,command.payload.actorId);
+ checkLease(actor,command.payload,principal,now);
+ if(actor.input?.sequence!==command.payload.sequence)throw Error('INPUT_SEQUENCE');
+ return startBaizeEncounter(ctx,actor,enabled);
+}
+export function createRuntimeHandlers({baizeEnabled=false}={}){return {...baizeHandlers,'battle.start':ctx=>startBattle(ctx,baizeEnabled),'actor.teleport':teleport,'actor.input':playerInput,'control.acquire':ctx=>lease(ctx),'control.takeover':ctx=>lease(ctx,true),'control.renew':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);a.controller.expiresAt=ctx.now+leaseDuration(ctx.principal);return {...a.controller};},'control.release':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);if(a.actionId)finish(ctx.snapshot,a,ctx.snapshot.actions[a.actionId],'cancelled',ctx.emit,'control_release');a.controller=null;ctx.emit('control.released',{actorId:a.actorId});return {status:'released'};},'action.submit':submit,'action.task':startTask,'action.cancel':cancelAction};}
 export class WorldRuntime{
  constructor(service,{worldId='default',intervalMs=100,onError=error=>console.error('World runtime tick failed',error)}={}){this.onError=onError;this.service=service;this.worldId=worldId;this.intervalMs=intervalMs;this.timer=null;}
  start(){if(!this.timer)this.timer=setInterval(()=>{try{this.tick();}catch(error){this.onError?.(error);}},this.intervalMs);this.timer?.unref?.();return this;}
  stop(){clearInterval(this.timer);this.timer=null;}
- tick(){return this.service.transactRuntime(this.worldId,({snapshot:s,now,emit,db})=>{const elapsed=now-(s.runtime?.lastTickAt??now-100);if(elapsed<100)return NO_RUNTIME_CHANGE;init(s);let steps=elapsed>1000?1:Math.floor(elapsed/100);if(elapsed>1000)for(const actor of s.actors)advanceNeeds(actor,elapsed-100);s.runtime.lastTickAt=now;while(steps-->0){for(const a of s.actors){advanceNeeds(a,100);if(a.resting){const seat=s.entities.find(e=>e.entityId===a.resting.entityId);if(!seat||JSON.stringify([seat.position,seat.rotation,seat.scale])!==a.resting.entityTransform||a.computerDeskId&&nearbyComputer(s,seat)?.entityId!==a.computerDeskId)leaveSeat(s,a);}
+ tick(){return this.service.transactRuntime(this.worldId,({snapshot:s,now,emit,db})=>{const elapsed=now-(s.runtime?.lastTickAt??now-100);if(elapsed<100)return NO_RUNTIME_CHANGE;init(s);let steps=elapsed>1000?1:Math.floor(elapsed/100);if(elapsed>1000)for(const actor of s.actors)if(!actor.battle)advanceNeeds(actor,elapsed-100);s.runtime.lastTickAt=now;while(steps-->0){for(const a of s.actors){if(a.battle){if(!a.battle.outcome&&now>=a.battle.deadline)a.battle=resolveBaizeTurn(a.battle,now);continue;}advanceNeeds(a,100);if(a.resting){const seat=s.entities.find(e=>e.entityId===a.resting.entityId);if(!seat||JSON.stringify([seat.position,seat.rotation,seat.scale])!==a.resting.entityTransform||a.computerDeskId&&nearbyComputer(s,seat)?.entityId!==a.computerDeskId)leaveSeat(s,a);}
  if(!a.actionId){const manualExpired=!a.input||a.input.manualActive===false||now-a.input.lastAt>250;if(a.grounded===false&&manualExpired){for(let i=0;i<2;i++)Object.assign(a,advancePlayer(s,a,[0,0],50));}if(!a.resting&&a.input&&manualExpired)a.pose=a.form==='swim'?'swimming':'idle';continue;}const action=s.actions[a.actionId];if(!action||terminal.has(action.status)){a.actionId=null;continue;}if(!a.controller||a.controller.expiresAt<=now||a.controller.leaseId!==action.leaseId||a.controller.leaseVersion!==action.leaseVersion){finish(s,a,action,'cancelled',emit,'lease_expired');continue;}
  // A submitted owner action keeps control through completion, then starts the idle window.
  if(a.controller.idleTimeoutMs===OWNER_LEASE_MS)a.controller.expiresAt=now+OWNER_LEASE_MS;
@@ -259,7 +289,7 @@ function advance(s,a,action,now,emit){
  }
  const computerDesk=action.computerDeskId&&s.entities.find(entity=>entity.entityId===action.computerDeskId);
  if(action.kind==='computer'&&(!computerDesk||nearbyComputer(s,s.entities.find(e=>e.entityId===action.entityId))?.entityId!==action.computerDeskId))throw Error('COMPUTER_UNAVAILABLE');
- if(action.kind==='jump'){for(let i=0;i<2;i++){Object.assign(a,advancePlayer(s,a,action.jumpDirection,50,action.elapsed===0,Math.min(action.jumpSpeedScale,Math.hypot(action.jumpEnd[0]-a.position[0],action.jumpEnd[2]-a.position[2])/(2.82*.05))));action.elapsed+=.05;}if(action.elapsed>=.6-1e-8&&a.grounded&&Math.hypot(action.jumpEnd[0]-a.position[0],action.jumpEnd[2]-a.position[2])<.001){finish(s,a,action,'completed',emit);Object.assign(a,waterPose(s,a));}return;}if(action.entityId){const entity=s.entities.find(e=>e.entityId===action.entityId);if(entity&&JSON.stringify([entity.position,entity.rotation,entity.scale])!==action.entityTransform)throw Error('TARGET_MOVED');}if(action.entityId&&!s.entities.some(e=>e.entityId===action.entityId))throw Error('ENTITY_REMOVED');if(action.phase==='moving'){const leg=action.legs[action.legIndex];if(leg.path.length){const sprint=action.kind==='move'&&action.gait==='sprint'&&a.form!=='swim';let budget=PLAYER_SPEED*.1*(sprint?2:1);a.sprint=sprint;a.pose='walking';while(leg.path.length&&budget>1e-8){const next=leg.path[0];if(!segmentWalkable(s,a.sceneId,a.position,next))throw Error('PATH_BLOCKED');const d=distance(a.position,next);if(d>1e-8)a.rotation=Math.atan2(next[0]-a.position[0],next[2]-a.position[2]);if(d<=budget){a.position=[...next];leg.path.shift();budget-=d;}else{a.position=[a.position[0]+(next[0]-a.position[0])*budget/d,a.position[1]+(next[1]-a.position[1])*budget/d,a.position[2]+(next[2]-a.position[2])*budget/d];budget=0;}const terrain=getTemplate(s.scenes.find(scene=>scene.sceneId===a.sceneId).templateId);if(terrain.authorSceneId)a.position[1]=surfaceAt(terrain,a.position[0],a.position[2])?.height??a.position[1];}Object.assign(a,waterPose(s,{...a,moving:true}));return;}if(leg.portal){validatePortal(s,a,leg.portal);a.sceneId=leg.portal.toSceneId;a.position=[...leg.portal.landing];action.legIndex++;emit('actor.scene_changed',{actorId:a.actorId,sceneId:a.sceneId,portalId:leg.portal.portalId});return;}if(action.kind==='move'){finish(s,a,action,'completed',emit);return;}const entity=s.entities.find(e=>e.entityId===action.entityId);if(!entity&&action.kind!=='eat')throw Error('ENTITY_REMOVED');action.phase='interacting';action.remainingTicks={sit:20,computer:20,sleep:100,eat:30,swim:60,slide:30,climbTree:TREE_CLIMB_TICKS}[action.kind];action.recoveryStart={...a.needs};if(entity&&action.kind!=='climbTree'){a.position=action.kind==='slide'?slidePoint(entity,0):anchor(entity,'interaction');a.rotation=entity.rotation;}a.pose=({sit:'seated',computer:'seated',sleep:'sleeping',swim:'swimming',slide:'climbing',eat:'eating',climbTree:'tree-climbing'})[action.kind];if(action.kind==='swim')a.form='swim';
+ if(action.kind==='jump'){for(let i=0;i<2;i++){Object.assign(a,advancePlayer(s,a,action.jumpDirection,50,action.elapsed===0||(action.secondJumpAt!=null&&Math.abs(action.elapsed-action.secondJumpAt)<1e-8),Math.min(action.jumpSpeedScale,Math.hypot(action.jumpEnd[0]-a.position[0],action.jumpEnd[2]-a.position[2])/(2.82*.05))));action.elapsed+=.05;}if(action.elapsed>=.6-1e-8&&a.grounded&&Math.hypot(action.jumpEnd[0]-a.position[0],action.jumpEnd[2]-a.position[2])<.001){finish(s,a,action,'completed',emit);Object.assign(a,waterPose(s,a));}return;}if(action.entityId){const entity=s.entities.find(e=>e.entityId===action.entityId);if(entity&&JSON.stringify([entity.position,entity.rotation,entity.scale])!==action.entityTransform)throw Error('TARGET_MOVED');}if(action.entityId&&!s.entities.some(e=>e.entityId===action.entityId))throw Error('ENTITY_REMOVED');if(action.phase==='moving'){const leg=action.legs[action.legIndex];if(leg.path.length){const sprint=action.kind==='move'&&action.gait==='sprint'&&a.form!=='swim';let budget=PLAYER_SPEED*.1*(sprint?2:1);a.sprint=sprint;a.pose='walking';while(leg.path.length&&budget>1e-8){const next=leg.path[0];if(!segmentWalkable(s,a.sceneId,a.position,next))throw Error('PATH_BLOCKED');const d=distance(a.position,next);if(d>1e-8)a.rotation=Math.atan2(next[0]-a.position[0],next[2]-a.position[2]);if(d<=budget){a.position=[...next];leg.path.shift();budget-=d;}else{a.position=[a.position[0]+(next[0]-a.position[0])*budget/d,a.position[1]+(next[1]-a.position[1])*budget/d,a.position[2]+(next[2]-a.position[2])*budget/d];budget=0;}const terrain=getTemplate(s.scenes.find(scene=>scene.sceneId===a.sceneId).templateId);if(terrain.authorSceneId)a.position[1]=surfaceAt(terrain,a.position[0],a.position[2])?.height??a.position[1];}Object.assign(a,waterPose(s,{...a,moving:true}));return;}if(leg.portal){validatePortal(s,a,leg.portal);a.sceneId=leg.portal.toSceneId;a.position=[...leg.portal.landing];action.legIndex++;emit('actor.scene_changed',{actorId:a.actorId,sceneId:a.sceneId,portalId:leg.portal.portalId});return;}if(action.kind==='move'){finish(s,a,action,'completed',emit);return;}const entity=s.entities.find(e=>e.entityId===action.entityId);if(!entity&&action.kind!=='eat')throw Error('ENTITY_REMOVED');action.phase='interacting';action.remainingTicks={sit:20,computer:20,sleep:100,eat:30,swim:60,slide:30,climbTree:TREE_CLIMB_TICKS}[action.kind];action.recoveryStart={...a.needs};if(entity&&action.kind!=='climbTree'){a.position=action.kind==='slide'?slidePoint(entity,0):anchor(entity,'interaction');a.rotation=entity.rotation;}a.pose=({sit:'seated',computer:'seated',sleep:'sleeping',swim:'swimming',slide:'climbing',eat:'eating',climbTree:'tree-climbing'})[action.kind];if(action.kind==='swim')a.form='swim';
  if(computerDesk){a.computerDeskId=computerDesk.entityId;faceComputer(a,computerDesk);}
  if(action.kind==='eat')a.mealFoodId=action.foodId??'rice';
  if(action.kind==='climbTree'){Object.assign(a,treeClimbPose(entity,action.approachPosition,0),{grounded:true,verticalVelocity:0,airHeight:0,jumpStage:0,jumpHeld:false,supportHeight:0});}

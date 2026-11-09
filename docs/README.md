@@ -4,12 +4,14 @@
 
 | 想做什么 | 文档 |
 | --- | --- |
+| 传送到森林、游湖和体验白泽对战 | [玩法介绍](../README.md#带白泽去森林) |
 | 回顾开发中的问题与修复 | [踩坑日记](PITFALLS.md) |
 | 连接 MCP、授权、行动和搭建场景 | [MCP 对接手册](MCP-QUICKSTART.md) |
 | 复制给智能体或 DSH 的接入提示词 | [智能体与 DSH 提示词](MCP-PROMPTS.md) |
 | 理解初始世界、个人存档、模型与家具目录 | [存档与发布默认世界](WORLD-SAVES.md) |
 | 了解客户端、网络与验证边界 | [兼容说明](MCP-COMPATIBILITY.md) |
 | 导入和管理本地素材 | [可选本地素材包](LOCAL-ASSETS.md) |
+| 用格子搭建和校验野外地形 | [野外搭建工具](OUTDOOR-BUILDER.md) |
 | 了解默认关闭的直接动作与施法接口 | [MCP 高级动作接口](MCP-ADVANCED-ACTIONS.md) |
 | 提交前核对素材、存档和公开产物 | [提交与发布检查](RELEASING.md) |
 | 启动和打包 Electron 桌面版 | [桌面版说明](DESKTOP.md) |

@@ -20,6 +20,7 @@ export function blockedPublicFile(file){
  if(approved.has(p))return false;
  if(p.startsWith('resources/polyfork/'))return !polyforkFiles.has(p);
  if(p==='.npmrc')return true;
+ if(p.startsWith('01_无尾人物/'))return true;
  if(p.startsWith('desktop/'))return !desktopSources.has(p);
  if(p.startsWith('resources/character/')&&p!=='resources/character/manifest.json')return true;
  return /\.(unitypackage|fbx|prefab|unity|glb|gltf|blend\d*|pem|key|p12|pfx|sqlite(?:-wal|-shm)?|db(?:-wal|-shm)?|bin|gguf|onnx|safetensors|pt|pth|wav|mp3|ogg|webm|m4a|woff2?|ttf|otf)$/i.test(p)

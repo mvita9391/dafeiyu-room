@@ -4,6 +4,7 @@ import { surfaceAt } from '../../shared/world/coastal.js';
 import { SPELLS } from '../../shared/world/spells.js';
 import { spellTarget } from '../../shared/world/spell-target.js';
 import { createCastAim, spawnElementalCast } from '../effects/elemental/casts.js';
+import { UI_SOUND } from '../core/sound-dictionary.js';
 
 const WORLD_CAST_MAX_AGE_MS = 1250;
 
@@ -146,6 +147,7 @@ export function mountSpellBar({ canvas, scene, getContext, startCast, playSound 
       expires[index] = performance.now() + SPELLS[index].cooldown * 1000;
     });
     if (!started) return;
+    playSound?.(UI_SOUND.confirm);
     setSelected(-1);
   }, true);
   canvas.addEventListener('pointerup', event => {

@@ -3,6 +3,7 @@ import {makeCoastalBench,makeCoastalLantern} from './coastal-props.js';
 import {makeCoastalHouse} from './coastal.js';
 import {STORE_FURNITURE} from './convenience-store.js';
 import {OUTDOOR_FURNITURE} from './outdoor-furniture.js';
+import {makeYardPool} from './yard-pool.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { P } from '../core/palette.js';
@@ -607,6 +608,7 @@ function makeHangingPlant() {
 
 export const FURNITURE = {yardBench:{label:'长椅',icon:'🪑',make:makeCoastalBench},yardLantern:{label:'石灯笼',icon:'🏮',make:makeCoastalLantern},coastalHouse:{label:'海边小屋',icon:'🏠',make:makeCoastalHouse},
   ...OUTDOOR_FURNITURE,...STORE_FURNITURE,
+  yardPool:{label:'游泳池',icon:'🏊',make:makeYardPool},
   bed: { label: '床', icon: '🛏️', make: makeBed },
   desk: { label: '电脑桌', icon: '🖥️', make: makeDesk },
   chair: { label: '椅子', icon: '🪑', make: makeChair },

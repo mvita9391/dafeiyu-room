@@ -148,7 +148,7 @@ test('MCP tasks run to a destination and attack a discovered target without aimi
   const runtime=new WorldRuntime(service);
   const read=()=>service.readSnapshot('default');
   const tick=()=>{now+=100;runtime.tick();};
-  service.transactRuntime('default',({snapshot})=>Object.assign(snapshot.actors[0],{sceneId:'yard',position:[10,0,8],grounded:true}));
+  service.transactRuntime('default',({snapshot})=>Object.assign(snapshot.actors[0],{sceneId:'yard',position:[3,0,5],grounded:true}));
   const actorId=f.actorId;
   const {leaseId,leaseVersion}=await call('actor_take_control',{actorId,requestId:'task-control'});
   const token={actorId,leaseId,leaseVersion};
@@ -156,13 +156,13 @@ test('MCP tasks run to a destination and attack a discovered target without aimi
    for(let i=0;i<220&&read().actions[actionId].status==='running';i++)tick();
    const action=await call('action_get',{actionId});assert.equal(action.status,'completed',JSON.stringify(action));return action;
   };
-  const sequence=await call('actor_run_sequence',{...token,requestId:'sequence',target:{sceneId:'yard',groundPosition:[10,6.1]},maneuvers:['kickCombo','doubleJump']});
+  const sequence=await call('actor_run_sequence',{...token,requestId:'sequence',target:{sceneId:'yard',groundPosition:[3,3]},maneuvers:['kickCombo','doubleJump']});
   const sequenceDone=await finish(sequence.actionId);
-  assert.deepEqual(sequenceDone.result.position,[10,0,6.1]);
+  assert.deepEqual(sequenceDone.result.position,[3,0,3]);
   assert.deepEqual(sequenceDone.result.completedManeuvers,['kickCombo','doubleJump']);
   const target=(await call('world_observe',{sceneId:'yard'})).combatTargets[1];
   assert.equal(target.targetId,'yard-dummy-2');
-  service.transactRuntime('default',({snapshot})=>{snapshot.actors[0].position=[18,0,7];});
+  service.transactRuntime('default',({snapshot})=>{snapshot.actors[0].position=[target.position[0]-12,0,target.position[2]];});
   const attack=await call('actor_attack_target',{...token,requestId:'attack',targetId:target.targetId});
   const start=read().actors[0].position;
   const attackDone=await finish(attack.actionId);

@@ -6,8 +6,10 @@ test('crossing a doorway hands confirmed local position to renderer without rewi
  timeline.push(make(-1.8),600);timeline.push(make(-2.3),800);timeline.push(make(-2.58),900);
  const confirmed=make(-2.86);let active=true,submitted=false;
  const player={get active(){return active;},stop(){},async drain(){},sample:()=>active?confirmed:null,release(){active=false;}};
- const context={player,client:{snapshot:{actors:[make(-2.58)]},async refreshState(){this.snapshot={actors:[confirmed]};return this.snapshot;}},actor:confirmed,actorTimeline:timeline,performance:{now:()=>1000},dispatcher:{async submit(){submitted=true;return {actionId:'door'};}},showMessage:message=>assert.fail(message),portalPending:true};
+ const context={player,client:{snapshot:{actors:[make(-2.58)]},async refreshState(){this.snapshot={actors:[confirmed]};return this.snapshot;}},actor:confirmed,actorTimeline:timeline,performance:{now:()=>1000},dispatcher:{async submit(){submitted=true;return {actionId:'door'};}},showMessage:message=>assert.fail(message),portalPending:true,encounterPending:true};
  vm.createContext(context);vm.runInContext(source.slice(source.indexOf('async function action('),source.indexOf('function interact(')),context);
+ await context.action('move',{sceneId:'yard'});assert.equal(submitted,false);
+ context.encounterPending=false;
  await context.action('move',{sceneId:'yard'});assert.equal(submitted,true);
  assert.deepEqual(timeline.sample(1000).position,confirmed.position,'renderer must not jump back to its 250 ms old sample after local input is released');
 });

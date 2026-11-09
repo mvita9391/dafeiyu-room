@@ -7,8 +7,8 @@ const needsExit=actor=>actor.pose==='sleeping'||actor.pose==='tree-climbing'||(a
 
 // Pending inputs, rather than predicted positions, are replayed after each ack.
 export class PlayerController {
- constructor({takeControl,send,onError=()=>{},onRelease=null,now=()=>performance.now(),holdMs=3000}){
-  Object.assign(this,{takeControl,send,onError,onRelease,now,holdMs});
+ constructor({takeControl,send,onError=()=>{},onRelease=null,onStep=null,now=()=>performance.now(),holdMs=3000}){
+  Object.assign(this,{takeControl,send,onError,onRelease,onStep,now,holdMs});
   this.generation=0;this.active=false;this.pending=[];
   this.holdUntil=0; // 本地操作权保护窗口：窗口内不接受服务端位置覆盖
  }
@@ -35,13 +35,17 @@ export class PlayerController {
   if(Math.hypot(x-base[0],z-base[2])>2.5)return [...base];
   return [x,base[1],z];
  }
- step(snapshot,direction,dt,jump=false,sprint=false,crawl=false,boxing=false){
+ step(snapshot,direction,dt,jump=false,sprint=false,crawl=false,boxing=false,dive){
   if(!this.active)return;
   this.snapshot=snapshot;this.held=!!Math.hypot(...direction);
   if(this.held)this.holdUntil=this.now()+this.holdMs;
-  const input={sequence:++this.sequence,dtMs:Math.min(50,Math.max(0,dt*1000)),direction,...jump?{jump:true}:{},...sprint?{sprint:true}:{},...crawl?{crawl:true}:{},...boxing?{boxing:true}:{}};
+  const input={sequence:++this.sequence,dtMs:Math.min(50,Math.max(0,dt*1000)),direction,...jump?{jump:true}:{},...sprint?{sprint:true}:{},...crawl?{crawl:true}:{},...boxing?{boxing:true}:{},...(dive===undefined?{}:{dive})};
   this.pending.push(input);
-  if(!this.frozen)this.state=advancePlayer(snapshot,this.state,direction,input.dtMs,input.jump,inputSpeedScale(input));
+  if(!this.frozen){
+   const previous=this.state;
+   this.state=advancePlayer(snapshot,previous,direction,input.dtMs,input.jump,inputSpeedScale(input),input.dive);
+   this.onStep?.(previous,this.state,snapshot);
+  }
   // A disconnected tab must not accumulate an unbounded speculative world.
   if(this.pending.reduce((sum,f)=>sum+f.dtMs,0)>1000)this.fail(Error('移动同步超时，请重试'),this.generation);
  }
@@ -68,7 +72,7 @@ export class PlayerController {
   this.ack=ack;this.pending=this.pending.filter(input=>input.sequence>ack);
   if(frozen){this.state={...actor,moving:false,speed:0,pose:this.state.pose};return;}
   this.state={...actor,position:[...actor.position]};
-  for(const input of this.pending)this.state=advancePlayer(this.snapshot,this.state,input.direction,input.dtMs,input.jump,inputSpeedScale(input));
+  for(const input of this.pending)this.state=advancePlayer(this.snapshot,this.state,input.direction,input.dtMs,input.jump,inputSpeedScale(input),input.dive);
   if(protectedByLocal&&localPosition){
    this.state.position=localPosition;this.state.rotation=localRotation;
    // 服务端 actor 在纯键盘移动时不带 moving/pose，保护窗口内沿用本地运动状态，

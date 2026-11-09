@@ -1,3 +1,5 @@
+import {registerAuthorScene} from './author-scenes.js';
+import {FOREST_BOUNDS,FOREST_TERRAIN_ID,FOREST_LANDMARKS,FOREST_SURFACES,FOREST_TREE_COLLIDERS} from './forest.js';
 import {COASTAL_ZONES,COASTAL_LANDMARKS} from './coastal.js';
 import {STREET_HOME} from './street-home.js';
 import {STORE_STREET_BOUNDS,STORE_STREET_COLLIDERS} from './store-street.js';
@@ -9,7 +11,24 @@ function template(id,kind,bounds){
  return {templateId:id,version:1,kind,groundY:0,bounds,buildBounds:rect(x0+.2,x1-.2,z0+.2,z1-.2),maxEntities:100,spawn:[1,0,1],spawnClearance:rect(.5,1.5,.5,1.5),portalAppearance:kind==='indoor'?'door':'gate',portalSlots:slots,regions:[{zoneId:'activity',purpose:'activity',bounds:rect(x0/2,x1/2,z0/2,z1/2)},{zoneId:'wall',purpose:'wall',bounds:rect(x0+.2,x0+.9,z0+.2,z1-.2)},{zoneId:'decoration',purpose:'decoration',bounds:rect(x1-.9,x1-.2,z0+.2,z1-.2)},...slots.map(s=>({zoneId:`entry-${s.slotId}`,purpose:'entry-clearance',bounds:s.clearance})),{zoneId:'passage',purpose:'passage',bounds:rect(-.6,.6,z0,z1)}],allowedStyles:['cozy','natural'],protectedRegions:[]};
 }
 const square=(r)=>rect(-r,r,-r,r);
-const templates={cozy_room_v1:template('cozy_room_v1','indoor',square(3.6)),courtyard_v1:template('courtyard_v1','outdoor',rect(-8.5,22,-8.5,14.5)),street_corner_v1:template('street_corner_v1','outdoor',STORE_STREET_BOUNDS)};
+export const COURTYARD_BOUNDS=Object.freeze(rect(-8.5,22,-18.5,14.5));
+const templates={cozy_room_v1:template('cozy_room_v1','indoor',square(3.6)),courtyard_v1:template('courtyard_v1','outdoor',COURTYARD_BOUNDS),street_corner_v1:template('street_corner_v1','outdoor',STORE_STREET_BOUNDS)};
+export const YARD_FOREST_SLOT='forest-gate';
+export const FOREST_RETURN_SLOT='yard-gate';
+function forestGate(slotId,side,x,z,normal){
+ return {slotId,side,position:[x,0,z],inwardNormal:[normal,0,0],width:2.4,
+  landing:[x+normal*.65,0,z],trigger:rect(x-.45,x+.45,z-1.2,z+1.2),
+  clearance:rect(x+Math.min(0,normal*2.9),x+Math.max(0,normal*2.9),z-1.45,z+1.45)};
+}
+templates.courtyard_v1.portalSlots.push(forestGate(YARD_FOREST_SLOT,'east',COURTYARD_BOUNDS.x1,-8,-1));
+registerAuthorScene({id:FOREST_TERRAIN_ID,surfaces:FOREST_SURFACES});
+templates.forest_v1={...template('forest_v1','outdoor',FOREST_BOUNDS),
+ authorSceneId:FOREST_TERRAIN_ID,maxStepHeight:.20,spawn:[...FOREST_LANDMARKS[0].position],
+ spawnClearance:rect(-31.8,-28.2,-1.45,1.45),landmarks:FOREST_LANDMARKS,
+ regions:[{zoneId:'trailhead',purpose:'activity',bounds:rect(-31,-21,-4,4)}],
+ staticColliders:FOREST_TREE_COLLIDERS,
+ portalSlots:[forestGate(FOREST_RETURN_SLOT,'west',FOREST_BOUNDS.x0,0,1)],
+};
 templates.street_corner_v1.staticColliders=[...STREET_HOME.colliders,...STORE_STREET_COLLIDERS];templates.street_corner_v1.legacyDoorNormal=STREET_HOME.inwardNormal;
 for(const slot of templates.street_corner_v1.portalSlots){
  if(slot.slotId==='north')Object.assign(slot,{position:[5.2,0,-6.5],landing:[5.2,0,-5.55],width:1.4,trigger:rect(4.5,5.9,-6.5,-5.1),clearance:rect(4.5,5.9,-6.5,-5.2)});

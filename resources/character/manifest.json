@@ -5,6 +5,12 @@
       "sha256": "76b5a0ca81f803748e8f5420f7cc99a13bc93eea32883e6362ffcabfdf34ff33",
       "bytes": 25381944,
       "runtime": true
+    },
+    {
+      "path": "resources/character/models/baize.glb",
+      "sha256": "901868f1d0659ce63175862cd94a0c5739ad7f7dbdc93b7feb9e787e7cf0cd81",
+      "bytes": 16692584,
+      "runtime": true
     }
   ]
 }

@@ -1,15 +1,15 @@
 import {surfaceAt,COASTAL_ZONES} from '../../shared/world/coastal.js';
-import {getCatalogEntry} from '../../shared/world/catalog.js';
+import {footprintCorners as corners,getCatalogEntry} from '../../shared/world/catalog.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {findPath,portalEnds,nearestFree} from '../../shared/world/navigation.js';
-export function corners(e){const f=getCatalogEntry(e.type).footprint,c=Math.cos(e.rotation),s=Math.sin(e.rotation);return [[-1,-1],[-1,1],[1,1],[1,-1]].map(([x,z])=>{x*=f.width*e.scale[0]/2;z*=f.depth*e.scale[2]/2;return [e.position[0]+x*c+z*s,e.position[2]-x*s+z*c];});}
+export {corners};
 export function overlaps(a,b){const pa=corners(a),pb=corners(b);return [a.rotation,b.rotation].every(r=>[r,r+Math.PI/2].every(t=>{const axis=[Math.cos(t),-Math.sin(t)],proj=p=>p.map(v=>v[0]*axis[0]+v[1]*axis[1]),x=proj(pa),y=proj(pb);return Math.max(...x)>Math.min(...y)+1e-7&&Math.max(...y)>Math.min(...x)+1e-7;}));}
 export function overlapsRect(e,b){const pa=corners(e);const proxy={position:[(b.x0+b.x1)/2,0,(b.z0+b.z1)/2],rotation:0,scale:[1,1,1],type:e.type};const f=getCatalogEntry(e.type).footprint;proxy.scale=[(b.x1-b.x0)/f.width,1,(b.z1-b.z0)/f.depth];return overlaps(e,proxy);}
 const json=x=>JSON.stringify(x);
 const portalFailure=(code,p,sceneId)=>{const error=Error(code);error.details={sceneId,portalId:p.id||p.portalId,endpoints:p.kind==='legacy'?[{sceneId:p.fromSceneId},{sceneId:p.toSceneId}]:[p.from,p.to]};throw error;};
 export function validateSpatial(before,snapshot){
  const changed=snapshot.entities.filter(e=>json(e)!==json(before.entities.find(x=>x.entityId===e.entityId)));
- for(const e of changed){const d=getCatalogEntry(e.type),scene=snapshot.scenes.find(s=>s.sceneId===e.sceneId),t=getTemplate(scene.templateId);if(e.protected)throw Error('PROTECTED_AREA');if(!d.sceneKinds.includes(t.kind))throw Error('ASSET_SCENE_MISMATCH');if(e.scale.some(v=>v<d.scale.min||v>d.scale.max)||Math.max(...e.scale)-Math.min(...e.scale)>1e-6)throw Error('INVALID_SCALE');
+ for(const e of changed){const d=getCatalogEntry(e.type),scene=snapshot.scenes.find(s=>s.sceneId===e.sceneId),t=getTemplate(scene.templateId);if(e.protected)throw Error('PROTECTED_AREA');if(!d.sceneKinds.includes(t.kind))throw Error('ASSET_SCENE_MISMATCH');if(e.scale.some(v=>v<d.scale.min||v>d.scale.max)||(d.scale.uniform&&Math.max(...e.scale)-Math.min(...e.scale)>1e-6))throw Error('INVALID_SCALE');
   if((t.staticColliders||[]).some(r=>overlapsRect(e,r)))throw Error('STATIC_COLLISION');
   if(corners(e).some(([x,z])=>x<t.buildBounds.x0||x>t.buildBounds.x1||z<t.buildBounds.z0||z>t.buildBounds.z1))throw Error('OUT_OF_BOUNDS');
   if(e.supportEntityId){const parent=snapshot.entities.find(p=>p.entityId===e.supportEntityId);if(!parent||parent.sceneId!==e.sceneId||parent.supportEntityId||d.placement!=='ground-or-support')throw Error('INVALID_SUPPORT');const a=getCatalogEntry(parent.type).anchors.find(a=>a.anchorId===e.supportAnchorId&&a.kind==='support');if(!a)throw Error('INVALID_SUPPORT');const c=Math.cos(parent.rotation),s=Math.sin(parent.rotation),local=corners(e).map(([x,z])=>{x-=parent.position[0];z-=parent.position[2];return [(x*c-z*s)/parent.scale[0],(x*s+z*c)/parent.scale[2]];});if(local.some(([x,z])=>x<a.bounds.x0-1e-6||x>a.bounds.x1+1e-6||z<a.bounds.z0-1e-6||z>a.bounds.z1+1e-6)||Math.abs(e.position[1]-(parent.position[1]+a.position[1]*parent.scale[1]))>1e-6)throw Error('INVALID_SUPPORT');if(snapshot.entities.filter(x=>x.supportEntityId===parent.entityId&&x.supportAnchorId===a.anchorId).length>a.capacity)throw Error('SUPPORT_CAPACITY');

@@ -1,9 +1,9 @@
 import {appendCatalogPreview} from './catalog-preview.js';
 import {releaseLocalAssets} from '../world/local-assets.js';
-import {LOCAL_CATEGORIES,listCatalog} from '../../shared/world/catalog.js';
+import {fitYardPool} from '../world/yard-pool.js';
+import {footprintCorners,getCatalogEntry,LOCAL_CATEGORIES,listCatalog} from '../../shared/world/catalog.js';
 import {surfaceAt} from '../../shared/world/coastal.js';
 import {authorHeightRange} from '../../shared/world/author-scenes.js';
-import {getCatalogEntry} from '../../shared/world/catalog.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import * as THREE from 'three';
 import { validLayout } from '../../shared/layout.js';
@@ -24,8 +24,8 @@ export const FURNITURE_CATEGORIES = {
 
 const STORAGE = 'dafeiyu-bedroom-layout-v1';
 export class RoomEditor {
-  constructor({ group, scene, camera, canvas, getScene, onToggle, onChange, onOrbit, contexts, worldClient, registry }) {
-    Object.assign(this, { group, scene, camera, canvas, getScene, onToggle, onChange, onOrbit });
+  constructor({ group, scene, camera, canvas, getScene, onToggle, onChange, onOrbit, onClickSound, contexts, worldClient, registry }) {
+    Object.assign(this, { group, scene, camera, canvas, getScene, onToggle, onChange, onOrbit, onClickSound });
     this.worldClient=worldClient;this.registry=registry;
     this.active = false; this.history = []; this.selected = null;
     this.ray = new THREE.Raycaster(); this.plane = new THREE.Plane(new THREE.Vector3(0,1,0),0);
@@ -95,16 +95,19 @@ export class RoomEditor {
     position:o.position.toArray(), rotation:o.rotation.y, scale:o.scale.toArray(),...(this.worldClient?{entityId:o.userData.entityId,draftId:o.userData.draftId??(o.userData.draftId=`draft-${crypto.randomUUID()}`)}:{} ) }));
     if(this.worldClient&&this.context?.templateId&&getTemplate(this.context.templateId).progressiveEntities){const ids=new Set(visible.map(e=>e.entityId));for(const e of this.worldClient.snapshot.entities)if(e.sceneId===this.context.sceneId&&!ids.has(e.entityId)&&!this.registry.entities.has(e.entityId))visible.push(structuredClone(e));}return visible; }
   validate(data) {
-    if((this.context?.templateId==='coastal_town_v1'||this.context?.templateId?.startsWith('local_')))return Array.isArray(data)&&data.every(o=>o.position.every(Number.isFinite));return validLayout(data,this.context?.templateId&&getTemplate(this.context.templateId).kind==='outdoor'?'yard':this.context?.sceneId || 'bedroom');
+    const {templateId,sceneId='bedroom'}=this.context||{};
+    if(templateId==='coastal_town_v1'||templateId?.startsWith('local_'))return Array.isArray(data)&&data.every(o=>o.position.every(Number.isFinite));
+    return validLayout(data,sceneId,templateId?getTemplate(templateId).bounds:undefined);
   }
   restore(data, ctx=this.context) {
-    if (ctx?.templateId!=='coastal_town_v1'&&!ctx?.templateId?.startsWith('local_')&&!validLayout(data,ctx?.templateId&&getTemplate(ctx.templateId).kind==='outdoor'?'yard':ctx?.sceneId || 'bedroom')) throw new Error('Invalid layout');
+    const {templateId,sceneId='bedroom'}=ctx||{};
+    if(templateId!=='coastal_town_v1'&&!templateId?.startsWith('local_')&&!validLayout(data,sceneId,templateId?getTemplate(templateId).bounds:undefined))throw new Error('Invalid layout');
     const target=ctx?.group || this.group;
     if(!ctx || ctx===this.context)this.select(null);
     for(const o of target.children.filter(o=>o.userData.furnitureType)){releaseLocalAssets(o);target.remove(o);}
     for (const entry of data) {
       const o=createFurniture(entry.type); o.position.fromArray(entry.position);
-      o.userData.entityId=entry.entityId;o.userData.draftId=entry.draftId;o.rotation.y=entry.rotation; o.scale.fromArray(entry.scale); target.add(o);
+      o.userData.entityId=entry.entityId;o.userData.draftId=entry.draftId;o.rotation.y=entry.rotation; o.scale.fromArray(entry.scale);fitYardPool(o);target.add(o);
     }
     this.onChange?.();
   }
@@ -303,7 +306,7 @@ export class RoomEditor {
   ground(e) {
     const rect=this.canvas.getBoundingClientRect();
     this.ray.setFromCamera(new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),this.camera);
-    if((this.context?.templateId==='coastal_town_v1'||this.context?.templateId?.startsWith('local_'))){const template=getTemplate(this.context.templateId),range=authorHeightRange(template.authorSceneId)||[-2,4],ray=this.ray.ray;if(ray.direction.y>=0)return null;const down=-ray.direction.y,start=Math.max(0,(ray.origin.y-range[1]-.1)/down),end=(ray.origin.y-range[0]+.1)/down;for(let t=start;t<=end;t+=.04){const p=ray.at(t,new THREE.Vector3()),s=surfaceAt(template,p.x,p.z);if(s&&p.y<=s.height)return new THREE.Vector3(p.x,s.height,p.z);}return null;}return this.ray.ray.intersectPlane(this.plane,new THREE.Vector3());
+    if((this.context?.templateId==='coastal_town_v1'||this.context?.templateId==='forest_v1'||this.context?.templateId?.startsWith('local_'))){const template=getTemplate(this.context.templateId),range=authorHeightRange(template.authorSceneId)||[-2,4],ray=this.ray.ray;if(ray.direction.y>=0)return null;const down=-ray.direction.y,start=Math.max(0,(ray.origin.y-range[1]-.1)/down),end=(ray.origin.y-range[0]+.1)/down;for(let t=start;t<=end;t+=.04){const p=ray.at(t,new THREE.Vector3()),s=surfaceAt(template,p.x,p.z);if(s&&p.y<=s.height)return new THREE.Vector3(p.x,s.height,p.z);}return null;}return this.ray.ray.intersectPlane(this.plane,new THREE.Vector3());
   }
   pick(e) {
     this.ground(e);this.group.updateMatrixWorld(true);
@@ -313,6 +316,7 @@ export class RoomEditor {
   }
   constrain(o) {
     const bounds=this.context?.bounds || {x0:-3.38,x1:3.38,z0:-3.38,z1:3.38};
+    fitYardPool(o);
     o.position.x=THREE.MathUtils.clamp(o.position.x,bounds.x0,bounds.x1);
     o.position.z=THREE.MathUtils.clamp(o.position.z,bounds.z0,bounds.z1);
     o.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(o);
@@ -320,7 +324,17 @@ export class RoomEditor {
       if(b.min[axis]<bounds[axis+'0'])o.position[axis]+=bounds[axis+'0']-b.min[axis];
       if(b.max[axis]>bounds[axis+'1'])o.position[axis]-=b.max[axis]-bounds[axis+'1'];
     }
-    if((this.context?.templateId==='coastal_town_v1'||this.context?.templateId?.startsWith('local_'))){const surface=surfaceAt(getTemplate(this.context.templateId),o.position.x,o.position.z);if(surface)o.position.y=surface.height+(getCatalogEntry(o.userData.furnitureType).authorOffsetY||0);}this.outline.setFromObject(o);
+    if(o.userData.furnitureType==='yardPool'){
+      const corners=footprintCorners({type:'yardPool',position:[0,0,0],rotation:o.rotation.y,scale:o.scale.toArray()});
+      // Match the server's footprint, with a tiny margin for rounding at the fence.
+      for(const [i,axis] of ['x','z'].entries()){
+        const offsets=corners.map(point=>point[i]);
+        const min=bounds[axis+'0']-Math.min(...offsets)+1e-6;
+        const max=bounds[axis+'1']-Math.max(...offsets)-1e-6;
+        o.position[axis]=THREE.MathUtils.clamp(o.position[axis],min,max);
+      }
+    }
+    if((this.context?.templateId==='coastal_town_v1'||this.context?.templateId==='forest_v1'||this.context?.templateId?.startsWith('local_'))){const surface=surfaceAt(getTemplate(this.context.templateId),o.position.x,o.position.z);if(surface)o.position.y=surface.height+(getCatalogEntry(o.userData.furnitureType).authorOffsetY||0);}this.outline.setFromObject(o);
   }
   add(type) {
     if(this.snapshot().length>=(this.context?.templateId?getTemplate(this.context.templateId).maxEntities||100:100)){this.status.textContent='家具数量已达当前场景上限';return;}
@@ -330,7 +344,18 @@ export class RoomEditor {
     this.group.add(o);this.select(o);this.constrain(o);
     if(this.worldClient){this.syncMessage='待放置 · 拖动家具松手保存，或点弹窗右上角「−」';this.refreshState();}else this.save();
   }
-  resize(factor){if(!this.selected)return;this.checkpoint();const limits=getCatalogEntry(this.selected.userData.furnitureType).scale;this.selected.scale.setScalar(Math.max(limits.min,Math.min(limits.max,this.selected.scale.x*factor)));this.constrain(this.selected);this.save();this.refreshState();}
+  resize(factor){
+    if(!this.selected)return;
+    this.checkpoint();
+    const {min,max,uniform}=getCatalogEntry(this.selected.userData.furnitureType).scale;
+    const scale=this.selected.scale;
+    if(uniform)scale.setScalar(THREE.MathUtils.clamp(scale.x*factor,min,max));
+    else {
+      const {x,y,z}=scale;
+      scale.multiplyScalar(THREE.MathUtils.clamp(factor,min/Math.min(x,y,z),max/Math.max(x,y,z)));
+    }
+    this.constrain(this.selected);this.save();this.refreshState();
+  }
   rotate(angle=Math.PI/2, checkpoint=true){if(!this.selected)return;if(checkpoint)this.checkpoint();this.selected.rotation.y+=angle;this.constrain(this.selected);this.save();}
   duplicate(){if(!this.selected||this.snapshot().length>=(this.context?.templateId?getTemplate(this.context.templateId).maxEntities||100:100))return;const source=this.selected;this.add(source.userData.furnitureType);this.selected.position.copy(source.position).add(new THREE.Vector3(.4,0,.4));this.selected.rotation.copy(source.rotation);this.selected.scale.copy(source.scale);this.constrain(this.selected);this.save();}
   remove(){if(!this.selected)return;this.checkpoint();releaseLocalAssets(this.selected);this.group.remove(this.selected);this.select(null);this.save();}
@@ -348,6 +373,7 @@ export class RoomEditor {
     };
     const openMenu=e=>{
       this.select(this.pick(e));if(!this.selected)return;
+      this.onClickSound?.();
       this.menu.hidden=false;this.menu.style.left=`${Math.min(e.clientX,innerWidth-170)}px`;this.menu.style.top=`${Math.min(e.clientY,innerHeight-150)}px`;
     };
     this.canvas.addEventListener('wheel',e=>{
@@ -373,7 +399,7 @@ export class RoomEditor {
       }
       if(e.button!==0||orbit)return;
       const object=this.pick(e);this.menu.hidden=true;
-      if(object){consume(e);this.checkpoint();this.select(object);this.dragging=true;this.pointerId=e.pointerId;
+      if(object){consume(e);this.onClickSound?.();this.checkpoint();this.select(object);this.dragging=true;this.pointerId=e.pointerId;
         this.offset.copy(object.position).sub(this.ground(e));this.canvas.setPointerCapture(e.pointerId);this.canvas.style.cursor='grabbing';}
       else this.select(null);
     },true);

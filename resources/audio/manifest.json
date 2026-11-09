@@ -1,6 +1,10 @@
 {
   "files": [
     {
+      "path": "resources/audio/action-battle-countdown.wav",
+      "sha256": "9a7ab563d843feb1cef4260c230d56edbbbce9dabdb8478520ccc23434066a90"
+    },
+    {
       "path": "resources/audio/feed.mp3",
       "sha256": "772908fd41059844b67e69020de6e34ff6f2d7043af60d91f033545b4e2afe6d"
     },
@@ -85,6 +89,10 @@
       "sha256": "2701c6790151586bbc4197fae4172c197eb173e5eb240052e906f2d9d66f486f"
     },
     {
+      "path": "resources/audio/action-spell-water-jet.wav",
+      "sha256": "07efb0ba8023ecbc9008b77876d2a255a9672357f0639d5dd48cdf14292a33a1"
+    },
+    {
       "path": "resources/audio/action-spell-wood.wav",
       "sha256": "a049c1481a198cf730887aa284d1a165cce872cc02a6e888cbc1225818c539eb"
     },
@@ -111,6 +119,245 @@
     {
       "path": "resources/audio/action-run-hard-right.wav",
       "sha256": "deca77dd9b49360dcee20f3a2ca028df34a65688c420fcdb15d2d4167da9ae54"
+    },
+    {
+      "path": "resources/audio/action-meal-voice-rice.wav",
+      "sha256": "c2540e719095b988208078f9604ad4ad82762ddc22cd1ec8018a2d352711c166"
+    },
+    {
+      "path": "resources/audio/action-meal-voice-hamburger.wav",
+      "sha256": "0ff3cb041f749374e0ccbc83d70fef7d3679bed12ff95d900624f91ea0d88102"
+    },
+    {
+      "path": "resources/audio/action-meal-voice-pizza.wav",
+      "sha256": "307c21d6ca15fbebee498ef2df67df9692ae8b7e20cf76db783f7a42af22524b"
+    },
+    {
+      "path": "resources/audio/action-meal-voice-croissant.wav",
+      "sha256": "ca0c689b0f9cc153433c8eedbcdf0717c7494535cb0577382182db2a8830d2c0"
+    },
+    {
+      "path": "resources/audio/action-meal-voice-apple.wav",
+      "sha256": "20e388c506f262d5f1fe99134d81a29d51c1a73901747014988804c70cbfe7bc"
+    },
+    {
+      "path": "resources/audio/action-meal-voice-strawberry.wav",
+      "sha256": "f714c5d217a205205da364e88c40f135ea60b8bd461b2777148ed708d1b9c48f"
+    },
+    {
+      "path": "resources/audio/action-spell-frost-release.wav",
+      "sha256": "e91a2d2faa8789e975b394c20779304f463ac0f6ffcabeb8ff8beaf8d57b2c14",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／13冰/冰-冰凌发射-LTT20070428.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-frost-impact.wav",
+      "sha256": "960e37b5a9802a56bf5dde5a76a156a32c0d33ed0704c129c81a12fe86b5077f",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／13冰/冰体击中-LTT20070428.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-storm-release.wav",
+      "sha256": "3f2687f431e38e0b0cd19e0e5d638efe107e3c0c51f3eff866f326e85d373795",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／06雷电/电流3-短暂-强-LTT20070517.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-storm-impact.wav",
+      "sha256": "6c6067ca2956d3d5488b9e331d8b6c22ce722691b4b21229066b10093e1f9262",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／技能击中类效果/带雷电的攻击 击中zth070510.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-meteor-release.wav",
+      "sha256": "82bcefb31573fae47aba9da6c841c5521bb8fcfcfd1922a966d48ee0d091870e",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／04火/火焰喷出-飞行-LTT20070426.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-meteor-impact.wav",
+      "sha256": "2bd62e286ba34395c5d5360740480dcec29545f37840b6e50ad2e01abae5820f",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／05土石类/击中－爆炸－石块碎裂1－mcx20060416.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-beam-release.wav",
+      "sha256": "210a2cbfc35bebeeb51690274de35040ae83d15cbe1286cd86b5f6662998c954",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／08光/发射光zth070509.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-beam-impact.wav",
+      "sha256": "94311bb1c178a739dcdd8b5a37bd898a402d7508602ba2452dd923a1ce5e1cf4",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／技能击中类效果/大型光击中zth070509.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-snare-release.wav",
+      "sha256": "d041f1611b32bc92c40157d95ee4a0e29b94fcf4728bff95cf39c627e89cfe2d",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／06雷电/电的魔法释放3-YS070516.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-snare-impact.wav",
+      "sha256": "3faa51773751e4673ffe2976e84d694dd2cef735c4eac0ed0c15e9df781203e3",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／06雷电/放电声2-xys20070511.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-crown-release.wav",
+      "sha256": "9cfa84cefc4a97ccbeabb9301cd5272c3ca7c01c988154c0e2e36545cdbb216e",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／13冰/光感的冰魔法释放-YS070522.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-crown-impact.wav",
+      "sha256": "e4f6ac113833e3241c51d1f0437127ae37ab73aceab5da16ac6b946b13553106",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／13冰/冰-冰凌四溅-LTT20070428.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-rift-release.wav",
+      "sha256": "ddcf101af06d96e0a5a5b10937846c55dd3a4e52d52988c08ba10f72bbbaf2a8",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／05土石类/呼啸而过1-夹杂碎石声音-LTT20070515.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-rift-impact.wav",
+      "sha256": "e40de78b23c313305322467d5d369a44c4fb579ddfa15812c6c97e53ddedaf24",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／技能击中类效果/土石类击中－mcx20070509.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-bloom-release.wav",
+      "sha256": "56c6853bff895d173df3f83423d1ec5615c085b928352329dc2657d151933530",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／07风类/风攻击－有铃声-mcx20070517.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-bloom-impact.wav",
+      "sha256": "4a439c4ee6ee3de38f16ae5c7a33e2514d1acaa3d2818e0ffe883c2332f5e3d2",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／02木/木头击中－YS070517.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-water-jet-release.wav",
+      "sha256": "4a1b1541d589c679205db65458a5c9b01adcaaa3814f4165f864b0d52e1c5767",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／03水/水发射-WQ20070516.wav"
+    },
+    {
+      "path": "resources/audio/action-spell-water-jet-impact.wav",
+      "sha256": "f9e753b0fd9440768343eabd4657c2aa97e9e278cb8f50b40f25b301459dc684",
+      "source": "用户提供的《游戏动画音效全集》／技能音效／技能击中类效果/水类击中－mcx20070509.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-1.wav",
+      "sha256": "95774cdd480813f86524faf90b3e2e1e179ea2a697511e4942765d15aa3d1e8e",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-2.wav",
+      "sha256": "8ac02eb4a8b5e7a068564161a47d0951a3def27268a61d31a9ba1953e5013281",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-3.wav",
+      "sha256": "4b29392add51350808a51a59355354149dd86d3a1d443e8f16813e39d9024c9e",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-4.wav",
+      "sha256": "d5cf6eaa425855161be46683898d6d3c2b8f0547d19c2444b54887b010ee0cc7",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-5.wav",
+      "sha256": "51fff095729637524bbca5db75e1a079be0566d79c74c34cf68369c442ce4607",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-6.wav",
+      "sha256": "421932ecdc4cb8df54d9563c7a7b36aa122d658c027659e0d2c089ad6e8ec35b",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-7.wav",
+      "sha256": "0907d4fcc165a6f4d89581c1eb53c3e71684842ad38ca6d79c1996e618f32f48",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-footstep-8.wav",
+      "sha256": "30ef2883f4c33d14e72f2ff0650e494b556f6182801063e6c65ecbf2847039e0",
+      "source": "用户提供的《游戏动画音效全集》／通用动作／脚步声－低沉-YS070521.wav"
+    },
+    {
+      "path": "resources/audio/action-meal-crunch-1.wav",
+      "sha256": "df4d8a3876a11cd1b53fc37c781fc9600483dbb7692d34a6985bc1cc017a2fef",
+      "source": "用户提供的《biting-champing-crunching-food.mp3》剪辑"
+    },
+    {
+      "path": "resources/audio/action-meal-crunch-2.wav",
+      "sha256": "0fe074884b3073203d9962431a6a64b210a3f56e7f07d3ceda5cd4a74db51aef",
+      "source": "用户提供的《biting-champing-crunching-food.mp3》剪辑"
+    },
+    {
+      "path": "resources/audio/action-meal-crunch-3.wav",
+      "sha256": "d2038d1f9fafd8d2ea3676fd90e5f74c49f943a0576ef21117b3e7bd40975132",
+      "source": "用户提供的《biting-champing-crunching-food.mp3》剪辑"
+    },
+    {
+      "path": "resources/audio/action-meal-soft-1.wav",
+      "sha256": "541f326bd35c82994b4173c407e7846267e0c4a3f569abf030747edcfb7bf239",
+      "source": "用户提供的《biting-champing-crunching-food.mp3》剪辑"
+    },
+    {
+      "path": "resources/audio/action-meal-soft-2.wav",
+      "sha256": "f6fe7269b319a654011dc94f665dd30d5012e481ac9e0d1d4855902257ffe1b6",
+      "source": "用户提供的《biting-champing-crunching-food.mp3》剪辑"
+    },
+    {
+      "path": "resources/audio/action-meal-soft-3.wav",
+      "sha256": "97bbf8d7d1e7360670da165ed65484a6174d9398222365ba451d9fa0f854e5e8",
+      "source": "用户提供的《biting-champing-crunching-food.mp3》剪辑"
+    },
+    {
+      "path": "resources/audio/action-ui-target-hover.wav",
+      "sha256": "d25ee5c633ed7b248e9f8ee7e0438edc37a333bf9e7a2f0f9e185ebfeec72363",
+      "source": "用户提供的《游戏动画音效全集》界面音效：开东西声音－xh20070511.wav"
+    },
+    {
+      "path": "resources/audio/action-ui-confirm.wav",
+      "sha256": "1e85114665371f32fd78c690ab827cf2a33e97748dd36981d077c0b403d7dc05",
+      "source": "用户提供的《游戏动画音效全集》界面音效：按钮类2－mcx20070509.wav"
+    },
+    {
+      "path": "resources/audio/action-effort-ha.wav",
+      "sha256": "3cd2ca636fad7994f49e424b949bba566b7fa5178c6a651aed8cb013c90a023b",
+      "source": "用户提供的《游戏动画音效全集》／人声采集素材／女激励／哈.wav（1.085–1.265 秒）"
+    },
+    {
+      "path": "resources/audio/action-effort-hey.wav",
+      "sha256": "8de12ee2b68a4c1956f4fd60ea130d23396a8c168a6d20d0d0de9f6f6f5e619f",
+      "source": "用户提供的《游戏动画音效全集》／人声采集素材／女激励／嘿.wav（3.776–4.010 秒）"
+    },
+    {
+      "path": "resources/audio/action-effort-huo.wav",
+      "sha256": "d02bea7ce267fc00ef58fff809d46e718f4b016b0de7c5b2f20ff5bf9b832225",
+      "source": "用户提供的《游戏动画音效全集》／人声采集素材／女激励／嚯.wav（5.182–5.450 秒）"
+    },
+    {
+      "path": "resources/audio/action-effort-ya.wav",
+      "sha256": "7ad9c24d3fb727c3c36ea20513bde72ec94c1f205f353e3b3098b4cb9b1477a8",
+      "source": "用户提供的《游戏动画音效全集》／人声采集素材／女激励／呀.wav（0.113–0.397 秒）"
+    },
+    {
+      "path": "resources/audio/town-theme.mp3",
+      "sha256": "b7dd7755c6d9e8aaad47bfc96e6120dccbdcf2b22eb8757098a36e805b3f1b02",
+      "source": "项目原创程序作曲；低音量混入用户提供的《游戏动画音效全集》／环境音效/10城市－城镇/城镇环境音白天zth070528.wav"
+    },
+    {
+      "path": "resources/audio/wild-theme.mp3",
+      "sha256": "2679a495b68492a3207d981154bff95f81da19fc40517dace05238b15989ef2e",
+      "source": "项目原创程序作曲；低音量混入用户提供的《游戏动画音效全集》／环境音效/08森林/森林白天zth070528.wav"
+    },
+    {
+      "path": "resources/audio/battle-theme.mp3",
+      "sha256": "4b6f0d95d717d12bc68e8f06e2a4fc12d3238c20f64e750d04ed455c68322cc1",
+      "source": "项目原创程序作曲"
+    },
+    {
+      "path": "resources/audio/action-scene-transition.wav",
+      "sha256": "049be9d708219061d6eeb3d5effe582c45df7b36d69a9c85f85a3024ef9b6441",
+      "source": "用户提供的《游戏动画音效全集》／乐器类/明亮音色琶音1-mcx20070511.wav（剪辑）"
+    },
+    {
+      "path": "resources/audio/action-battle-encounter.wav",
+      "sha256": "d07915a9f18b7ca06d47198606f05fa5b8b7c4b8e427efc63c44f548856fd2fe",
+      "source": "用户提供的《游戏动画音效全集》／乐器类/严重事件-短-鼓和锣-mcx20070511.wav（剪辑）"
     }
   ]
 }

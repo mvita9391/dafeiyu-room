@@ -5,7 +5,7 @@ import {defaultManifest} from '../../shared/world/default-manifest.js';
 import {nearestFree} from '../../shared/world/navigation.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {appendEvent,readEvents,readLatestCursor,projectEventPage} from './events.js';
-const scopeFor=kind=>kind.startsWith('build.')?'build:write':kind.startsWith('control.')||kind.startsWith('action.')||kind.startsWith('actor.')?'actor:control':'world:read';
+const scopeFor=kind=>kind.startsWith('build.')?'build:write':kind.startsWith('control.')||kind.startsWith('action.')||kind.startsWith('actor.')||kind.startsWith('battle.')?'actor:control':'world:read';
 // Trusted adapter-only principal: {subjectId,worldIds,actorIds,scopes,role,
 // expiresAt?,revoked?}. Never construct this object from command/request JSON.
 export function authorizePrincipal(principal,worldId,scope,actorId,now=Date.now()){
@@ -132,7 +132,7 @@ export class WorldService{
  execute(principal,command){
   if(!validateCommand(command).ok)throw Error('INVALID_COMMAND');
   authorizePrincipal(principal,command.worldId,scopeFor(command.kind),command.payload.actorId,this.clock());
-  if(['control.takeover','actor.teleport'].includes(command.kind)&&principal.role!=='owner')throw Error('UNAUTHORIZED');
+  if((['control.takeover','actor.teleport'].includes(command.kind)||command.kind.startsWith('battle.'))&&principal.role!=='owner')throw Error('UNAUTHORIZED');
   const movement=command.kind==='actor.input';
   const canBuffer=movement&&this.memoryPosition;
   const serialized=canonical(command);const db=this.db;
@@ -147,6 +147,8 @@ export class WorldService{
     ??db.prepare('SELECT command,result FROM movement_receipts WHERE subject_id=? AND world_id=? AND request_id=? AND expires_at>?').get(...identity,now);
    if(prior){if(prior.command!==serialized)throw Error('REQUEST_ID_REUSED');db.exec('COMMIT');return JSON.parse(prior.result);}
    const snapshot=this.readSnapshot(command.worldId);const handler=this.handlers[command.kind];if(!handler)throw Error('NOT_IMPLEMENTED');
+   const {actorId}=command.payload;
+   if(actorId&&!command.kind.startsWith('battle.')&&snapshot.actors.some(actor=>actor.actorId===actorId&&actor.battle))throw Error('ACTOR_IN_BATTLE');
    const protectedEntities=snapshot.entities.filter(entity=>entity.protected).map(entity=>[entity.entityId,canonical(entity)]);
    const {schemaVersion}=snapshot;
    const changeId=randomUUID();const pending=[];

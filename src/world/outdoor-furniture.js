@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {PICNIC_BENCH_Y,PICNIC_TOP_Y,UMBRELLA_RADIUS,UMBRELLA_RISE,UMBRELLA_TOP_Y} from '../../shared/world/yard-platforms.js';
 const wood=0xb97e53,dark=0x855e46,cream=0xf5e6ca,green=0x91b786;
 const material=color=>new THREE.MeshStandardMaterial({color,roughness:.85});
 function mesh(root,geometry,color,x=0,y=0,z=0){const m=new THREE.Mesh(geometry,material(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;root.add(m);return m;}
@@ -21,14 +22,14 @@ function makeSwing(){
 }
 function makePicnicTable(){
  const root=new THREE.Group();
- for(let i=0;i<5;i++)box(root,1.9,.09,.17,wood,0,.76,(i-2)*.18);
+ for(let i=0;i<5;i++)box(root,1.9,.09,.17,wood,0,PICNIC_TOP_Y-.045,(i-2)*.18);
  for(const x of [-.68,.68]){beam(root,[x,.05,-.6],[x,.74,.3],.065,dark);beam(root,[x,.05,.6],[x,.74,-.3],.065,dark);box(root,.13,.1,1.75,dark,x,.4,0);}
- for(const z of [-.8,.8])for(let i=0;i<2;i++)box(root,2.05,.08,.18,wood,0,.46,z+(i-.5)*.19);
+ for(const z of [-.8,.8])for(let i=0;i<2;i++)box(root,2.05,.08,.18,wood,0,PICNIC_BENCH_Y-.04,z+(i-.5)*.19);
  return root;
 }
 function makeUmbrella(){
  const root=new THREE.Group();pole(root,.3,.12,0xc5b7a3,0,.06);pole(root,.035,2.3,wood,0,1.2);
- const g=new THREE.ConeGeometry(1.28,.62,12,1,true);g.translate(0,2.05,0);
+ const g=new THREE.ConeGeometry(UMBRELLA_RADIUS,UMBRELLA_RISE,12,1,true);g.translate(0,UMBRELLA_TOP_Y-UMBRELLA_RISE/2,0);
  const cover=mesh(root,g,0xd6a58b);cover.material.side=THREE.DoubleSide;
  for(let i=0;i<12;i++){const a=i*Math.PI/6;beam(root,[0,2.36,0],[Math.cos(a)*1.27,1.74,Math.sin(a)*1.27],.012,cream);}
  pole(root,.045,.12,dark,0,2.42);return root;

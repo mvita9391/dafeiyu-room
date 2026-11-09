@@ -61,6 +61,7 @@
   #hud #world-sync-status[data-control]{font-weight:650;box-shadow:0 3px 12px #3c2e3324}
   #hud #world-sync-status[data-control="owner"]{background:#fff0d6;color:#683c13}
   #hud #world-sync-status[data-control="agent"]{background:#e9efff;color:#30477c}
+  #hud #world-sync-status[data-control="offline"]{background:#f9e6df;color:#8a3528}
 
   #spell-bar{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);
     z-index:31;width:max-content;max-width:calc(100vw - 20px);pointer-events:none}
@@ -159,6 +160,12 @@
     border:1px solid #e3d2bc;border-radius:12px;background:#fffdf7;color:#51454a;font:inherit;cursor:pointer}
   .food-grid button:hover{border-color:#b79065;background:#fff1d9}
   .food-grid .catalog-preview{width:min(100%,88px);height:auto;aspect-ratio:1;object-fit:contain;border-radius:7px}
+  .forest-teleport summary{position:relative;list-style:none;text-align:center}
+  .forest-teleport summary::after{content:'';position:absolute;right:12px;top:50%;width:5px;height:5px;
+    border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;transform:translateY(-50%) rotate(45deg)}
+  .forest-destinations{position:fixed;z-index:1;display:grid;gap:6px;min-width:86px;padding:8px;
+    background:#faf1e5f5;border:1px solid #fff9;border-radius:13px;box-shadow:0 7px 24px #30231828;font:14px system-ui}
+  .forest-teleport:not([open]) .forest-destinations{display:none}
 
   /* 第一视角 */
   #fp-reticle{position:fixed;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;
@@ -223,7 +230,7 @@
   <div id="world-sync-status" class="status-message" role="status">正在连接世界…</div>
 
   <div id="hint" class="tag">
-    <b>WASD</b> 移动 · 点 <b>Shift</b> 切换冲刺（按住 <b>Alt/Option</b> 也行） · <b>Ctrl/C</b> 匍匐 · <b>空格</b> 跳/起身 · <b>Q</b> 踢腿 · <b>E</b> 拳击 · <b>F</b> 翻滚 · <b>X</b> 坐下/起身 · <b>G</b> 随机跳舞<br/>
+    <b>WASD</b> 移动 · 点 <b>Shift</b> 切换冲刺（按住 <b>Alt/Option</b> 也行） · <b>Ctrl/C</b> 匍匐 · 水中 <b>C</b> 下潜/上浮 · <b>空格</b> 跳/起身 · <b>Q</b> 踢腿 · <b>E</b> 拳击 · <b>F</b> 翻滚 · <b>X</b> 坐下/起身 · <b>G</b> 随机跳舞<br/>
     俯视 / 第三人称：按住右键转镜头 · 第三人称可双键前进、滚轮缩放<br/>
     <b>V</b> 循环切换：等距 → 第一人称 → 第三人称 · <b>Esc</b> 返回等距<br/>
     点主角摸头 · 点击床睡觉 · 第一视角可用准星点击家具

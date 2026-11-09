@@ -1,3 +1,4 @@
+import {PET_SKILL_CHOICES} from './pet-skills.js';
 import {z} from 'zod';
 import {TEMPLATE_IDS} from './templates.js';
 import {ASSET_TYPES} from './catalog.js';
@@ -41,8 +42,14 @@ export const commandSchema=z.discriminatedUnion('kind',[
  cmd('build.apply',obj({planId:idSchema})),cmd('build.undo',obj({changeId:idSchema})),
  cmd('action.submit',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,kind:z.enum(['move','sit','sleep','swim','slide','eat','cancel','jump','climbTree','maneuver','computer']),gait:z.enum(GAITS).optional(),maneuver:z.enum(MANEUVERS).optional(),...spellFields,heading:z.number().finite().optional(),target:destination.optional(),foodId:z.enum(Object.keys(FOODS)).optional()})),
  cmd('action.task',task),
- cmd('actor.teleport',obj({actorId:idSchema,sceneId:idSchema})),
- cmd('actor.input',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,frames:z.array(obj({sequence:z.number().int().positive(),jump:z.boolean().optional(),dtMs:z.number().finite().min(0).max(50),direction:z.tuple([z.number().finite().min(-1).max(1),z.number().finite().min(-1).max(1)]),sprint:z.boolean().optional(),crawl:z.boolean().optional(),boxing:z.boolean().optional()})).min(1).max(120)})),
+ cmd('battle.start',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,sequence:z.number().int().positive()})),
+ cmd('battle.choose',obj({actorId:idSchema,battleId:idSchema,turn:rev,choice:z.enum([...PET_SKILL_CHOICES,'wait']),unitId:idSchema.optional(),target:idSchema.optional()})),
+ cmd('battle.leave',obj({actorId:idSchema,battleId:idSchema})),
+ cmd('actor.teleport',z.union([
+  obj({actorId:idSchema,sceneId:idSchema,landmarkId:idSchema.optional()}),
+  obj({actorId:idSchema,templateId:z.literal('forest_v1'),landmarkId:idSchema}),
+ ])),
+ cmd('actor.input',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,frames:z.array(obj({sequence:z.number().int().positive(),jump:z.boolean().optional(),dtMs:z.number().finite().min(0).max(50),direction:z.tuple([z.number().finite().min(-1).max(1),z.number().finite().min(-1).max(1)]),sprint:z.boolean().optional(),crawl:z.boolean().optional(),boxing:z.boolean().optional(),dive:z.boolean().optional()})).min(1).max(120)})),
  cmd('action.cancel',obj({actorId:idSchema,actionId:idSchema,leaseId:idSchema,leaseVersion:rev})),
  cmd('control.renew',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev})),cmd('control.release',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev})),
  cmd('control.acquire',obj({actorId:idSchema})),cmd('control.takeover',obj({actorId:idSchema})),

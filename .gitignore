@@ -30,6 +30,7 @@ docs/*
 !docs/WORLD-SAVES.md
 !docs/SELF-TEST.md
 !docs/LOCAL-ASSETS.md
+!docs/OUTDOOR-BUILDER.md
 !docs/MCP-ADVANCED-ACTIONS.md
 !docs/RELEASING.md
 !docs/DESKTOP.md
@@ -65,6 +66,7 @@ downloads/
 /resources/character/characters/
 /resources/character/notes/
 !/resources/character/models/Dafeiyu.glb
+!/resources/character/models/baize.glb
 !resources/polyfork/glb/*.glb
 # User-supplied Unity packages and derived local content never ship.
 *.unitypackage
@@ -87,6 +89,7 @@ downloads/
 /大肥鱼背面.png
 /鲸娘女仆三视图设定稿.png
 /鲸娘角色3D建模设定图.png
+/01_无尾人物/
 
 # Credentials, including vault keys outside the default data directory
 *.key

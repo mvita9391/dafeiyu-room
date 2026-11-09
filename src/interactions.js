@@ -97,6 +97,7 @@ export class Interactions {
         let obj = ns[0].object;
         while (obj && !obj.userData.npc) obj = obj.parent;
         if (obj) {
+          this.onClickSound?.();
           const d = obj.userData.npc;
           this.hud.say(d.line, new THREE.Vector3(obj.position.x, 1.9, obj.position.z), 3.2);
           return;
@@ -104,6 +105,7 @@ export class Interactions {
       }
     }
     if (this.whale.group.visible && this.ray.intersectObject(this.whale.group, true).length) {
+      this.onClickSound?.();
       this.pet(); return;
     }
 
@@ -114,7 +116,7 @@ export class Interactions {
         const entity=object?.userData.worldEntity;if(!entity)continue;
         let part=hit.object,requested;while(part&&part!==object){requested??=part.userData.actionKind;part=part.parent;}
         const kind=requested||getCatalogEntry(entity.type).actions[0];
-        if(kind)this.worldAction(kind,{entityId:object.userData.entityId});
+        if(kind){this.onClickSound?.();this.worldAction(kind,{entityId:object.userData.entityId});}
         return; // The nearest furniture occludes objects behind it.
       }
     }

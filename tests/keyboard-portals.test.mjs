@@ -4,13 +4,14 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {portalEnds,walkable,segmentWalkable} from '../shared/world/navigation.js';
-import {portalInwardNormal} from '../src/core/keyboard-portals.js';
+import {portalInwardNormal,reachesKeyboardPortal} from '../src/core/keyboard-portals.js';
+import {YARD_FOREST_SLOT} from '../shared/world/templates.js';
 import {advancePlayer} from '../shared/world/movement.js';
 import {ActionDispatcher} from '../src/core/action-dispatcher.js';
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 const handler=source.slice(source.indexOf('function directions('),source.indexOf('function renderActor('));
 async function harness(snapshot,position,az,keys){
- const sent=[];const context={travelAction:null,whale:{},settings:{isOpen:false},foodPicker:{isOpen:false},fpActive:false,fp:{yaw:0},renderPosition:new THREE.Vector3(),sprintHeld:false,sprintToggle:false,thirdActive:false,crawling:false,wantSlide:false,slideUntil:0,slideDirX:0,slideDirZ:0,original:{startSlideClip(){}},teleportPending:false,actor:{sceneId:'a',position},iso:{az,drag:0},keys:new Set(keys),agentConnect:{},editor:null,lastInputAt:0,lastPortalAt:0,portalPending:false,client:{snapshot,connectionStatus:'connected'},goal:new THREE.Vector3(),portalEnds,portalInwardNormal,walkable,segmentWalkable,stopMovement(){},dispatcher:new ActionDispatcher(async(kind,target)=>sent.push({kind,target}))};
+ const sent=[];const context={travelAction:null,whale:{},settings:{isOpen:false},foodPicker:{isOpen:false},fpActive:false,fp:{yaw:0},renderPosition:new THREE.Vector3(),sprintHeld:false,sprintToggle:false,thirdActive:false,crawling:false,diveRequested:undefined,wantSlide:false,slideUntil:0,slideDirX:0,slideDirZ:0,original:{startSlideClip(){}},teleportPending:false,actor:{sceneId:'a',position},iso:{az,drag:0},keys:new Set(keys),agentConnect:{},editor:null,lastInputAt:0,lastPortalAt:0,portalPending:false,client:{snapshot,connectionStatus:'connected'},goal:new THREE.Vector3(),portalEnds,portalInwardNormal,reachesKeyboardPortal,YARD_FOREST_SLOT,walkable,segmentWalkable,stopMovement(){},dispatcher:new ActionDispatcher(async(kind,target)=>sent.push({kind,target}))};
  context.player={active:false,begin(a){this.active=true;this.state={...a,position:[...a.position]};},step(s,d,dt){this.state=advancePlayer(s,this.state,d,dt*1000);},sample(){return this.state;},flush:async()=>{},stop(){this.held=false;this.stopped=true;},release(){this.active=false;}};
  context.action=(...args)=>context.dispatcher.submit(...args);
  vm.createContext(context);vm.runInContext(handler,context);context.updateKeyboard(.016,3000);await context.dispatcher.running;
@@ -32,6 +33,16 @@ for(const [slot,position,inward,tangent,outward] of [
  const reversed={...snapshot,portals:[{from:{sceneId:'b',slotId:opposite[slot]},to:{sceneId:'a',slotId:slot},bidirectional:true}]};
  assert.equal((await harness(reversed,position,az,[key(inward)])).sent.length,0);
  assert.equal((await harness(reversed,position,az,[key(outward)])).sent[0]?.target.sceneId,'b');
+});
+test('forest gate accepts either side of its opening but rejects walking into the fence',async()=>{
+ const snapshot={scenes:[{sceneId:'a',templateId:'courtyard_v1'},{sceneId:'b',templateId:'forest_v1'}],entities:[],
+  portals:[{from:{sceneId:'a',slotId:YARD_FOREST_SLOT},to:{sceneId:'b',slotId:'yard-gate'},bidirectional:true}]};
+ for(const z of [-8.85,-7.15]){
+  assert.equal((await harness(snapshot,[21.3,0,z],0,['KeyS'])).sent[0]?.target.sceneId,'b');
+  assert.equal((await harness(snapshot,[21.85,0,z],0,['KeyS'])).sent[0]?.target.sceneId,'b');
+  assert.equal((await harness(snapshot,[21.3,0,z],0,['KeyW'])).sent.length,0);
+ }
+ assert.equal((await harness(snapshot,[21.3,0,-6.7],0,['KeyS'])).sent.length,0);
 });
 test('legacy west boundary uses its world normal',async()=>{
  const snapshot={scenes:[{sceneId:'a',templateId:'cozy_room_v1'},{sceneId:'b',templateId:'courtyard_v1'}],entities:[],portals:[{kind:'legacy',fromSceneId:'bedroom',toSceneId:'yard'}]};

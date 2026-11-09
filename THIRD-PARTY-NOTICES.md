@@ -64,6 +64,8 @@ THE SOFTWARE.
 
 公开运行模型 `Dafeiyu.glb` 包含付费 Meshy 服务生成内容，由破晓手记制作、修复和编辑。授权以项目作者实际拥有的权利为范围。资源清单及 SHA-256 见 `resources/character/manifest.json`。
 
+公开运行模型 `baize.glb` 来自项目作者提供的白泽模型包，原文件名为 `base_basic_shaded.glb`。伙伴白泽和野生白泽共用此文件。
+
 ## 本地后端新增依赖
 
 ### fastify 5.12.8 — MIT
@@ -141,7 +143,7 @@ SQLite 通过 Node.js 内置 `node:sqlite` 调用，不额外分发数据库引�
 
 以上组件的版权和许可证由 npm 安装包各自 LICENSE 提供；传递依赖以 `package-lock.json` 为准，分别遵循各自声明。
 
-本项目不分发语音合成/识别引擎、模型权重、录音、字体或系统声音。播放用音频由外部智能体提供，临时保留于服务内存，不打包进公开产物；音频提供方负责其内容来源与使用权限。
+公开构建随游戏提供 `resources/audio/manifest.json` 列出的配音和音效。外部智能体通过 MCP 提交的音频临时保留于服务内存，音频提供方负责其内容来源与使用权限。
 
 ### LinearAbiltyCastingThreeJS — MIT
 

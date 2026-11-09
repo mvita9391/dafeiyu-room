@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+export const FOREST_SUNNY_SKY={top:'#68b3ef',horizon:'#d1edff',bottom:'#c3e1f2'};
+
 const VERT = /* glsl */`
   varying vec3 vPos;
   void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
@@ -13,6 +15,7 @@ const FRAG = /* glsl */`
       ? mix(uBottom, uHorizon, smoothstep(0.35, 0.52, h))
       : mix(uHorizon, uTop, smoothstep(0.52, 0.92, h));
     gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>
   }
 `;
 

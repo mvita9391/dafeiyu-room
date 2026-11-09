@@ -1,0 +1,54 @@
+.baize-battling :is(#hud,#left-rail,#actions,#spell-bar,#author-progress){visibility:hidden}
+.baize-battle[hidden],.baize-skill-popup[hidden]{display:none}
+.baize-battle.baize-orbiting,.baize-battle.baize-orbiting *{cursor:none;user-select:none}
+.baize-battle{position:fixed;inset:0;z-index:1100;outline:none;color:#f6fbf4;font:500 14px/1.45 system-ui,sans-serif;background:linear-gradient(0deg,#12241dbb,transparent 39%,transparent 77%,#14271d77);--battle-card:#192c24ed;--battle-line:#d5e6c745}
+.baize-top{position:absolute;z-index:2;top:24px;left:50%;transform:translateX(-50%);padding:8px 14px;display:flex;align-items:center;gap:18px;background:var(--battle-card);border:1px solid var(--battle-line);border-radius:30px;white-space:nowrap}
+.baize-top span{color:#d7efac}.baize-top b{font-size:12px}
+.baize-message{position:absolute;bottom:6%;left:5%;max-width:40%;padding:13px 16px;background:var(--battle-card);border:1px solid var(--battle-line);border-radius:13px;display:grid;gap:4px}
+.baize-message b{font-size:16px}.baize-message span{color:#cae1bc;font-size:12px}.baize-message span:empty{display:none}
+.baize-menu{position:absolute;right:5%;bottom:4%;display:grid;justify-items:end;gap:9px;width:auto}
+.baize-moves{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;width:100%}
+.baize-battle :is(.baize-menu,.baize-skill-popup) button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--battle-line);background:var(--battle-card);border-radius:11px;padding:8px 9px;text-align:left}
+.baize-battle :is(.baize-menu,.baize-skill-popup) button:hover:not(:disabled),.baize-battle :is(.baize-menu,.baize-skill-popup) button:focus-visible{outline:2px solid #d4e9a5;background:#314a32}
+.baize-battle :is(.baize-menu,.baize-skill-popup) button:disabled{opacity:.54;cursor:default}
+.baize-moves button{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px}
+.baize-moves kbd{padding:1px 5px;background:#c6e29522;border-radius:4px;color:#d7efac}
+.baize-moves span{display:grid;gap:2px}.baize-moves small{font-size:10px;color:#cae1bc}.baize-moves em{margin-left:auto;font-size:12px;color:#d7efac;font-style:normal}
+.baize-menu .baize-leave{padding:7px 15px}
+.baize-battle .baize-element{display:inline-block;padding:0 5px;border:1px solid color-mix(in srgb,var(--element-color) 46%,transparent);border-radius:4px;color:var(--element-color);font-size:10px;vertical-align:1px;white-space:nowrap}
+.baize-library summary{cursor:pointer;color:#e1efda;font-size:12px}
+.baize-library-list{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:1;width:min(410px,91vw);max-height:min(450px,67vh);overflow:auto;padding:10px 12px;background:var(--battle-card);border:1px solid var(--battle-line);border-radius:13px;box-sizing:border-box}
+.baize-library-list div{display:grid;grid-template-columns:36px minmax(82px,1fr) 1.15fr 47px;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--battle-line)}
+.baize-library-list div:last-child{border:0}.baize-library-list .baize-element{justify-self:start}.baize-library-list small,.baize-library-list div>span:last-child{color:#c7dec1;font-size:11px}
+.baize-moves b .baize-element{margin-left:3px}
+.baize-ready{color:#d7efac;font-size:12px;font-variant-numeric:tabular-nums}
+.baize-clock{position:absolute;top:clamp(66px,9vh,96px);left:50%;transform:translateX(-50%);color:transparent;-webkit-text-stroke:2px #eaf5d9;font:800 clamp(52px,10vmin,98px)/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;filter:drop-shadow(0 2px 4px #10281d9e);pointer-events:none}
+.baize-clock.urgent{-webkit-text-stroke-color:#ffd28b}
+.baize-formation{position:absolute;inset:0;pointer-events:none}
+.baize-entering .baize-formation{visibility:hidden}
+.baize-damage-number{position:absolute;z-index:1;pointer-events:none;color:#ffc06f;-webkit-text-stroke:3px #9d2816;paint-order:stroke fill;font:900 clamp(27px,4.6vmin,48px)/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;text-shadow:0 2px 4px #641708c9,0 0 10px #ff5828a0;white-space:nowrap}
+.baize-unit{position:absolute;transform:translate(-50%,7%);box-sizing:border-box;min-width:85px;padding:4px 7px;color:#edf7ea;background:#142a23e8;border:1px solid #a9d4e98a;border-radius:7px;font:600 11px/1.3 system-ui;white-space:nowrap;text-align:center;display:grid;gap:2px}
+.baize-unit.enemy{border-color:#ec9b85;pointer-events:auto;cursor:pointer}
+.baize-unit.enemy:disabled{pointer-events:none}
+.baize-unit.marked{border-color:#ffdc69;box-shadow:0 0 0 2px #ffdb6966}
+.baize-unit.defeated{opacity:.52}
+.baize-unit span{font-size:10px;color:#d3e3d1}.baize-unit i{height:4px;border-radius:4px;background:#080f0c;overflow:hidden}
+.baize-unit em{display:block;height:100%;border-radius:4px;background:#95db92;transition:width .2s}
+.baize-command-actions{display:flex;justify-content:flex-end;gap:7px;width:100%}
+.baize-wait[hidden]{display:none}
+.baize-battle :is(.baize-menu,.baize-skill-popup) button[aria-pressed=true]{outline:1px solid #e0eaa1;background:#314a32}
+.baize-moves button{min-width:0}.baize-moves button b{font-size:12px}
+@media(max-width:760px){.baize-unit{min-width:65px;font-size:9px}.baize-message{max-width:55%}}
+.baize-battle.baize-model-target{cursor:pointer}
+.baize-unit.rear{transform:translate(-50%,calc(-100% - 5px));min-width:76px}
+@media(max-width:760px){.baize-unit.rear{min-width:65px}}
+
+.baize-skill-popup{--popup-width:min(348px,48vw,var(--available-width,348px));position:absolute;z-index:1;width:var(--popup-width);max-height:54vh;overflow:auto;box-sizing:border-box;padding:10px;background:var(--battle-card);border:1px solid #cce0ac88;border-radius:14px;box-shadow:0 10px 28px #14241d72;left:clamp(8px,calc(var(--anchor-x,50%) + 64px),calc(100% - var(--popup-width) - 8px));top:clamp(70px,calc(var(--anchor-y,50%) - 120px),45vh)}
+.baize-skill-popup.open-left{left:clamp(8px,calc(var(--anchor-x,50%) - var(--popup-width) - 64px),calc(100% - var(--popup-width) - 8px))}
+.baize-skill-title{padding:1px 4px 8px;color:#e0efbe;font-size:12px;font-weight:700}
+.baize-skill-popup .baize-moves button{padding:6px;gap:5px}
+.baize-skill-popup .baize-moves small{white-space:nowrap}
+.baize-target-kind{grid-column:1/-1;display:block;padding:2px 5px;border-radius:5px;background:#9de6ff22;color:#c8f2ff;text-align:center;font-size:13px;line-height:1.4}
+.baize-target-kind[data-mode=t]{background:#ffd98825;color:#ffe3a1}
+.baize-target-kind[data-mode=all]{background:#e3c3ff29;color:#eed6ff}
+@media(max-width:740px){.baize-skill-popup .baize-moves{grid-template-columns:1fr}}

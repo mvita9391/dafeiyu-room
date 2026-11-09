@@ -1,5 +1,16 @@
 import {getTemplate} from '../../shared/world/templates.js';
 
+export function reachesKeyboardPortal(portal,position,dx,dz){
+ const [nx,,nz]=portal.inwardNormal;
+ if(dx*nx+dz*nz>=-1e-6)return false;
+ const x=position[0]-portal.departure[0],z=position[2]-portal.departure[2];
+ if(portal.gate){
+  const along=x*nx+z*nz;
+  return along>-.55&&along<.42&&Math.abs(z*nx-x*nz)<1.08;
+ }
+ return Math.hypot(x,z)<.8;
+}
+
 // Use the local endpoint's normal; camera rotation is already applied to input.
 export function portalInwardNormal(snapshot,portal,reverse=false){
  const endpoint=reverse?(portal.to||{sceneId:portal.toSceneId,slotId:portal.toSlotId}):(portal.from||{sceneId:portal.fromSceneId,slotId:portal.fromSlotId});

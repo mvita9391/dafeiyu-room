@@ -8,6 +8,7 @@ const localOutdoor=Object.freeze({...outdoor,distance:180,far:700});
 const townOutdoor=Object.freeze({...localOutdoor,el:28*Math.PI/180});
 export function cameraPolicyFor(templateId){
  if(['cozy_room_v1','bedroom','room','living'].includes(templateId))return indoor;
+ if(templateId==='forest_v1')return outdoor;
  if(templateId==='local_author_town_v1')return townOutdoor;
  if(templateId.startsWith('local_'))return localOutdoor;
  if(['courtyard_v1','yard','street_corner_v1','convenience-store','coastal_town_v1','seaside-town'].includes(templateId))return outdoor;

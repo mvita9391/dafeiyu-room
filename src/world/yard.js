@@ -1,7 +1,7 @@
 import {makeYardGarden, protectFarmSpace} from './yard-garden.js';
-import { makePoolSlide } from './pool-slide.js';
+import { animateYardPool, fitYardPool } from './yard-pool.js';
 import { buildYardTraining } from './yard-training.js';
-import { registerSceneFurniture } from './props.js';
+import { createFurniture, registerSceneFurniture } from './props.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { P } from '../core/palette.js';
@@ -11,6 +11,60 @@ import { getTemplate } from '../../shared/world/templates.js';
 
 const rbox = (w, h, d, r = 0.04, s = 3) => new RoundedBoxGeometry(w, h, d, s, r);
 const setShadow = (m, cast = true) => { m.castShadow = cast; m.receiveShadow = true; return m; };
+
+function poolGroundCutout(group, bounds, materials) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024; canvas.height = 768;
+  const context = canvas.getContext('2d');
+  const mask = new THREE.CanvasTexture(canvas);
+  mask.flipY = false;
+  mask.generateMipmaps = false;
+  mask.minFilter = THREE.LinearFilter;
+  const { x0, x1, z0, z1 } = bounds;
+  const area = new THREE.Vector4(x0, z0, 1 / (x1 - x0), 1 / (z1 - z0));
+  for (const material of materials) {
+    material.poolCutoutMask = mask;
+    material.onBeforeCompile = shader => {
+      shader.uniforms.poolCutoutMask = { value: mask };
+      shader.uniforms.poolCutoutArea = { value: area };
+      shader.vertexShader = 'varying vec2 vPoolGroundPosition;\n' + shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvPoolGroundPosition = (modelMatrix * vec4(transformed, 1.0)).xz;',
+      );
+      shader.fragmentShader = `
+        varying vec2 vPoolGroundPosition;
+        uniform sampler2D poolCutoutMask;
+        uniform vec4 poolCutoutArea;
+      ` + shader.fragmentShader.replace(
+        '#include <clipping_planes_fragment>',
+        `#include <clipping_planes_fragment>
+        vec2 poolUv = (vPoolGroundPosition - poolCutoutArea.xy) * poolCutoutArea.zw;
+        if (texture2D(poolCutoutMask, poolUv).a > 0.5) discard;`,
+      );
+    };
+  }
+  let previous;
+  return () => {
+    const pools = group.children.filter(object => object.userData.poolRect);
+    const signature = JSON.stringify(pools.map(pool => [pool.position.x, pool.position.z, pool.rotation.y, pool.scale.x, pool.scale.z]));
+    if (signature === previous) return;
+    previous = signature;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#fff';
+    for (const pool of pools) {
+      const rect = pool.userData.poolRect;
+      context.save();
+      context.scale(canvas.width * area.z, canvas.height * area.w);
+      context.translate(pool.position.x - x0, pool.position.z - z0);
+      context.rotate(-pool.rotation.y);
+      context.scale(pool.scale.x, pool.scale.z);
+      // Tuck the opening under the rim so the ground cannot show at the seam.
+      context.fillRect(rect.x0 - .025, rect.z0 - .025, rect.x1 - rect.x0 + .05, rect.z1 - rect.z0 + .05);
+      context.restore();
+    }
+    mask.needsUpdate = true;
+  };
+}
 
 function grassTexture({ size = 512 } = {}) {
   const c = document.createElement('canvas'); c.width = c.height = size;
@@ -50,20 +104,23 @@ export function buildYard() {
   const cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2;
   const W = X1 - X0, D = Z1 - Z0;
   const wallX = X0 + 0.45;                 // 房子外墙内表面
+  const houseNorth = -8.75;
 
   /* ---------- 地面 ---------- */
   const grassTex = tex(grassTexture(), { repeat: [W / 2.8, D / 2.55], aniso: 12 });
   const grassMat = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.96, metalness: 0, envMapIntensity: 0.3, color: 0xf0f2da });
   const grass = new THREE.Mesh(new THREE.PlaneGeometry(W, D), grassMat);
+  grass.name = 'yard-grass';
   grass.rotation.x = -Math.PI / 2;
   grass.position.set(cx, 0.005, cz);
   grass.receiveShadow = true;
   group.add(grass);
 
-  const slab = setShadow(new THREE.Mesh(rbox(W + 0.04, 0.34, D + 0.04, 0.06, 3), clay(0x84674c, { roughness: 0.9 })));
+  const slab = setShadow(new THREE.Mesh(rbox(W + 0.04, 0.34, D + 0.04, 0.06, 3), clay(0x84674c, { roughness: 0.9 }).clone()));
   slab.position.set(cx, -0.18, cz); group.add(slab);
-  const plinth = setShadow(new THREE.Mesh(rbox(W + 0.34, 0.46, D + 0.34, 0.1, 3), clay(P.plinth, { roughness: 0.85 })));
+  const plinth = setShadow(new THREE.Mesh(rbox(W + 0.34, 0.46, D + 0.34, 0.1, 3), clay(P.plinth, { roughness: 0.85 }).clone()));
   plinth.position.set(cx, -0.52, cz); group.add(plinth);
+  const refreshPoolCutout = poolGroundCutout(group, { x0: X0, x1: X1, z0: Z0, z1: Z1 }, [grassMat, slab.material, plinth.material]);
 
   // 石板小径（从门口到院子中间）
   const stoneC = document.createElement('canvas'); stoneC.width = stoneC.height = 256;
@@ -89,7 +146,7 @@ export function buildYard() {
   const win = { z0: -2.35, z1: -0.95, y0: 0.95, y1: 2.15 };
   const wallCenterX = wallX - t / 2;
   const segs = [
-    { z0: Z0, z1: win.z0, y0: 0, y1: H },
+    { z0: houseNorth, z1: win.z0, y0: 0, y1: H },
     { z0: win.z0, z1: win.z1, y0: 0, y1: win.y0 },
     { z0: win.z0, z1: win.z1, y0: win.y1, y1: H },
     { z0: win.z1, z1: door.z0, y0: 0, y1: H },
@@ -104,8 +161,8 @@ export function buildYard() {
     group.add(m);
   }
   // 屋檐
-  const eave = setShadow(new THREE.Mesh(rbox(0.85, 0.12, D + 0.2, 0.04, 3), clay(0x8a6247, { roughness: 0.8 })));
-  eave.position.set(wallX + 0.18, H + 0.06, cz); group.add(eave);
+  const eave = setShadow(new THREE.Mesh(rbox(0.85, 0.12, Z1 - houseNorth + 0.2, 0.04, 3), clay(0x8a6247, { roughness: 0.8 })));
+  eave.position.set(wallX + 0.18, H + 0.06, (Z1 + houseNorth) / 2); group.add(eave);
 
   // 门框
   const trimMat = clay(0xf0e6d6, { roughness: 0.65 });
@@ -282,128 +339,14 @@ export function buildYard() {
     return g;
   };
   group.add(fence(X1 - 0.1, cz, D - 0.3, Math.PI / 2));
+  group.add(fence(wallCenterX, (Z0 + houseNorth) / 2, houseNorth - Z0, Math.PI / 2));
   group.add(fence(cx, Z0 + 0.1, W - 0.2, 0));
   group.add(fence(cx, Z1 - 0.1, W - 0.2, Math.PI));
 
-  // 游泳池
-  const poolStart = group.children.length;
-  const POOL = { x0: 3.1, x1: 7.9, z0: -7.1, z1: -3.7 };
-  const poolCx = (POOL.x0 + POOL.x1) / 2, poolCz = (POOL.z0 + POOL.z1) / 2;
-  const poolW = POOL.x1 - POOL.x0, poolD = POOL.z1 - POOL.z0;
-
-  // 瓷砖贴图
-  const tileC = document.createElement('canvas'); tileC.width = tileC.height = 256;
-  const tg = tileC.getContext('2d');
-  tg.fillStyle = '#bfe3ec'; tg.fillRect(0, 0, 256, 256);
-  for (let y = 0; y < 256; y += 32) for (let x = 0; x < 256; x += 32) {
-    tg.fillStyle = `rgb(${186 + Math.random() * 18},${226 + Math.random() * 14},${236 + Math.random() * 12})`;
-    tg.fillRect(x + 1.5, y + 1.5, 29, 29);
-  }
-  const tileTex = tex(tileC, { repeat: [3, 2.4], aniso: 8 });
-  const tileMat = new THREE.MeshStandardMaterial({ map: tileTex, roughness: 0.75, envMapIntensity: 0.5 });
-
-  // 池沿
-  const rimMat = new THREE.MeshStandardMaterial({ color: 0xf3ece0, roughness: 0.85, envMapIntensity: 0.4 });
-  const rimH = 0.34, rimW = 0.2, rimY = rimH / 2;
-  const addRim = (w, d, x, z) => {
-    const m = setShadow(new THREE.Mesh(rbox(w, rimH, d, 0.05, 3), rimMat));
-    m.position.set(x, rimY, z); group.add(m);
-  };
-  addRim(poolW + rimW * 2, rimW, poolCx, POOL.z0 - rimW / 2);
-  addRim(poolW + rimW * 2, rimW, poolCx, POOL.z1 + rimW / 2);
-  addRim(rimW, poolD, POOL.x0 - rimW / 2, poolCz);
-  addRim(rimW, poolD, POOL.x1 + rimW / 2, poolCz);
-
-  // 池壁 + 池底（瓷砖）
-  const basinDepth = 0.9;
-  const basinFloor = new THREE.Mesh(new THREE.PlaneGeometry(poolW, poolD), tileMat);
-  basinFloor.rotation.x = -Math.PI / 2;
-  basinFloor.position.set(poolCx, -basinDepth + 0.06, poolCz);
-  basinFloor.receiveShadow = true;
-  group.add(basinFloor);
-  for (const [w, d, x, z] of [
-    [poolW, 0.04, poolCx, POOL.z0 - 0.02],
-    [poolW, 0.04, poolCx, POOL.z1 + 0.02],
-    [0.04, poolD, POOL.x0 - 0.02, poolCz],
-    [0.04, poolD, POOL.x1 + 0.02, poolCz],
-  ]) {
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(w, basinDepth), tileMat);
-    wall.position.set(x, -basinDepth / 2, z);
-    if (d < 0.1 && w < 0.1) wall.rotation.y = Math.PI / 2;
-    else if (w < 0.1) wall.rotation.y = Math.PI / 2;
-    wall.receiveShadow = true;
-    group.add(wall);
-  }
-
-  // 水面
-  const waterMat = new THREE.MeshPhysicalMaterial({
-    color: 0x3fa8d8, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.9,
-    envMapIntensity: 1.5, clearcoat: 1, clearcoatRoughness: 0.04,
-  });
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(poolW - 0.06, poolD - 0.06), waterMat);
-  water.rotation.x = -Math.PI / 2;
-  water.position.set(poolCx, 0.22, poolCz);
-  group.add(water);
-
-  // 水面波纹圈
-  const ripples = [];
-  for (let i = 0; i < 3; i++) {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.2, 0.26, 32),
-      new THREE.MeshBasicMaterial({ color: 0xdff4ff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(poolCx, 0.235, poolCz);
-    group.add(ring);
-    ripples.push({ mesh: ring, life: 0 });
-  }
-
-  // 扶梯
-  const metal = new THREE.MeshStandardMaterial({ color: 0xd9dde3, roughness: 0.3, metalness: 0.8 });
-  for (const s2 of [-1, 1]) {
-    const rail = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.024, 8, 16, Math.PI), metal);
-    rail.position.set(poolCx + s2 * 0.28, 0.46, POOL.z0 - 0.02);
-    rail.rotation.y = Math.PI / 2;
-    rail.castShadow = true;
-    group.add(rail);
-  }
-  for (let i = 0; i < 3; i++) {
-    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.56, 8), metal);
-    rung.rotation.z = Math.PI / 2;
-    rung.position.set(poolCx, 0.42 - i * 0.22, POOL.z0 - 0.02);
-    rung.castShadow = true;
-    group.add(rung);
-  }
-
-  // 泳圈
-  const floatRing = new THREE.Group();
-  const torus = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.09, 10, 22), clay(0xf2a0a8, { roughness: 0.7 }));
-  torus.rotation.x = Math.PI / 2;
-  floatRing.add(torus);
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2;
-    const seg = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.092, 8, 6, 0.5), clay(0xfdf5ea, { roughness: 0.7 }));
-    seg.rotation.x = Math.PI / 2; seg.rotation.z = a;
-    floatRing.add(seg);
-  }
-  floatRing.position.set(POOL.x1 - 0.45, 0.26, POOL.z1 - 0.35);
-  floatRing.rotation.z = 0.12;
-  group.add(floatRing);
-
-  const slide=makePoolSlide();
-  slide.position.set(POOL.x0 - 0.04, 0, poolCz);
-  slide.rotation.y = -Math.PI / 2;
-  group.add(slide);
-
-  const poolGroup=new THREE.Group();
-  poolGroup.name='yard-pool';
-  const poolParts=group.children.slice(poolStart);
-  for(const part of poolParts)poolGroup.add(part);
+  const poolGroup=createFurniture('yardPool');
+  poolGroup.position.set(5.5,0,-5.4);
   group.add(poolGroup);
-  for(const part of poolParts){part.position.x-=poolCx;part.position.z-=poolCz;}
-  poolGroup.position.set(poolCx,0,poolCz);
-  poolGroup.userData.poolRect={x0:-poolW/2,x1:poolW/2,z0:-poolD/2,z1:poolD/2};
-  registerSceneFurniture(poolGroup,'yardPool','游泳池','🏊');
+  let pools=[poolGroup];
 
   // 树
   const tree = new THREE.Group();
@@ -597,11 +540,7 @@ export function buildYard() {
   group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
 
   function update(dt, t) {
-    // 水面微波 + 泳圈轻晃
-    water.position.y = 0.22 + Math.sin(t * 1.4) * 0.008;
-    waterMat.opacity = 0.9 + Math.sin(t * 0.9) * 0.02;
-    floatRing.position.y = 0.26 + Math.sin(t * 1.1) * 0.012;
-    floatRing.rotation.z = 0.12 + Math.sin(t * 0.8) * 0.05;
+    for(const pool of pools)animateYardPool(pool,t);
     const attr = ff.geometry.attributes.position;
     for (let i = 0; i < ffData.length; i++) {
       const d = ffData[i];
@@ -622,8 +561,12 @@ export function buildYard() {
 
   return {
     group, update, training,
-    refreshLandscape:()=>protectFarmSpace(group,garden),
-    pool: POOL,
+    refreshLandscape:()=>{
+      pools=group.children.filter(object=>object.userData.furnitureType==='yardPool');
+      for(const pool of pools)fitYardPool(pool);
+      protectFarmSpace(group,garden);
+      refreshPoolCutout();
+    },
     containsWater(position) {
       group.updateMatrixWorld(true);
       return group.children.some(o=>{

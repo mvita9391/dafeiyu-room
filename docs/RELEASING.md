@@ -4,9 +4,10 @@
 
 | 内容 | 公开范围 |
 | --- | --- |
-| 大肥鱼角色 | 公开角色只保留带动画的 `resources/character/models/Dafeiyu.glb`。Vite 按角色清单打包。 |
+| 人物和宠物 | 大肥鱼 `Dafeiyu.glb` 和白泽 `baize.glb`，均保留骨骼与动画，由 Vite 按角色清单打包。 |
 | 精选家具模型 | `resources/polyfork/` 中清单列出的 146 个模型、缩略图及 CC BY 4.0 署名。 |
-| 界面图片和音效 | `public/` 中的界面图和许可文本，以及 `resources/audio/manifest.json` 列出的音频。 |
+| 游戏音频 | 游戏使用的角色配音、动作与界面音效、背景音乐统一放在 `resources/audio/`，随仓库和桌面版分发。 |
+| 界面图片和许可文本 | `public/` 中的界面图和许可文本。 |
 | 本机内容 | `.cache/` 中的全量模型、素材包及导入备份，`data/` 中的存档与密钥，以及作者工作文件留在本机。 |
 | Electron 桌面版 | `desktop/` 下的源码、测试与打包配置随仓库提供，运行时由 npm 安装，打包产物留在本机。 |
 
