@@ -51,10 +51,10 @@ const settings=mountSettings({
  onReset:async()=>{
   try{
    const restored=await editor?.requestReset();
-   if(restored)showMessage('已恢复当前版本的默认布局');
+   if(restored)showMessage('已恢复全部内置场景的默认布局');
    return restored;
   }catch(error){
-   const reasons={LAYOUT_SAVE_PENDING:'请先保存当前布置',ENTITY_IN_USE:'请先结束当前互动',ACTOR_BLOCKED:'请先把角色移到空地',PORTAL_BLOCKED:'默认摆放与当前门口冲突',REVISION_CONFLICT:'布局已更新，请重新确认'};
+   const reasons={LAYOUT_SAVE_PENDING:'请先保存当前布置',ENTITY_IN_USE:'请先结束当前互动',ACTOR_BLOCKED:'请先把角色移到空地',PORTAL_BLOCKED:'默认摆放与当前门口冲突',FOREST_GATE_OCCUPIED:'院子东侧的门已连接到其他场景',PORTAL_SLOT_UNAVAILABLE:'森林返回院子的门已被占用',QUOTA_EXCEEDED:'场景已满，无法创建森林',REVISION_CONFLICT:'布局已更新，请重新确认'};
    showMessage(`恢复默认失败 · ${reasons[error.message]??error.message}`);
    return false;
   }

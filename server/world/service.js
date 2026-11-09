@@ -150,11 +150,10 @@ export class WorldService{
    const snapshot=this.readSnapshot(command.worldId);const handler=this.handlers[command.kind];if(!handler)throw Error('NOT_IMPLEMENTED');
    const {actorId}=command.payload;
    if(actorId&&!command.kind.startsWith('battle.')&&snapshot.actors.some(actor=>actor.actorId===actorId&&actor.battle))throw Error('ACTOR_IN_BATTLE');
-   const resetFarm=command.kind==='build.resetScene'
-    ?defaultManifest.scenes.find(scene=>scene.sceneId===command.payload.sceneId)?.entities.find(entity=>entity.type==='yardFarm')
-    :null;
+   const resetYard=command.kind==='build.resetWorld'||(command.kind==='build.resetScene'&&command.payload.sceneId==='yard');
+   const resetFarm=resetYard?defaultManifest.scenes.find(scene=>scene.sceneId==='yard')?.entities.find(entity=>entity.type==='yardFarm'):null;
    const protectedEntities=snapshot.entities.filter(entity=>entity.protected).map(entity=>{
-    const expected=resetFarm&&entity.sceneId===command.payload.sceneId&&entity.type==='yardFarm'
+    const expected=resetFarm&&entity.sceneId==='yard'&&entity.type==='yardFarm'
      ?protectFarm({...entity,...resetFarm},entity.plots):entity;
     return [entity.entityId,canonical(expected)];
    });

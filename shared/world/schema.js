@@ -39,6 +39,7 @@ const cmd=(kind,payload)=>obj({...base,kind:z.literal(kind),payload});
 export const commandSchema=z.discriminatedUnion('kind',[
  cmd('build.editLock',obj({sceneId:idSchema,locked:z.boolean()})),
  cmd('build.resetScene',obj({sceneId:idSchema,baseRevision:rev})),
+ cmd('build.resetWorld',obj({baseRevision:rev})),
  cmd('build.preview',obj({baseRevision:rev,ops:z.array(buildOperationSchema).min(1).max(20)})),
  cmd('build.apply',obj({planId:idSchema})),cmd('build.undo',obj({changeId:idSchema})),
  cmd('action.submit',obj({actorId:idSchema,leaseId:idSchema,leaseVersion:rev,kind:z.enum(['move','sit','sleep','swim','slide','eat','cancel','jump','climbTree','maneuver','computer']),gait:z.enum(GAITS).optional(),maneuver:z.enum(MANEUVERS).optional(),...spellFields,heading:z.number().finite().optional(),target:destination.optional(),foodId:z.enum(Object.keys(FOODS)).optional()})),

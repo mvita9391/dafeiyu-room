@@ -5,7 +5,6 @@ import {footprintCorners,getCatalogEntry,LOCAL_CATEGORIES,listCatalog} from '../
 import {surfaceAt} from '../../shared/world/coastal.js';
 import {authorHeightRange} from '../../shared/world/author-scenes.js';
 import {getTemplate} from '../../shared/world/templates.js';
-import {defaultManifest} from '../../shared/world/default-manifest.js';
 import * as THREE from 'three';
 import { validLayout } from '../../shared/layout.js';
 import { LayoutSync, WorldLayoutSync } from './layout-sync.js';
@@ -247,9 +246,7 @@ export class RoomEditor {
     }document.body.append(this.menu);
   }
   canReset() {
-    const context=this.context;
-    return Boolean(context&&!context.loading&&(!this.worldClient||
-      defaultManifest.scenes.some(scene=>scene.sceneId===context.sceneId&&scene.templateId===context.templateId)));
+    return Boolean(this.context&&!this.context.loading);
   }
   async requestReset() {
     if(this.resetPending||!this.context||this.context.loading)return false;
@@ -258,9 +255,10 @@ export class RoomEditor {
     try{
       if(!await this.confirmReset()||this.context!==context)return false;
       if(this.worldClient){
-        if(this.sync.busy||this.sync.pending||this.dragging)throw Error('LAYOUT_SAVE_PENDING');
-        await this.worldClient.dispatch({kind:'build.resetScene',payload:{sceneId:context.sceneId,baseRevision}});
-        this.sync.lastChangeId=null;
+        const contexts=Object.values(this.contexts);
+        if(this.dragging||contexts.some(({sync})=>sync?.busy||sync?.pending))throw Error('LAYOUT_SAVE_PENDING');
+        await this.worldClient.dispatch({kind:'build.resetWorld',payload:{baseRevision}});
+        for(const {sync} of contexts)if(sync)sync.lastChangeId=null;
         this.select(null);
         return true;
       }
@@ -274,10 +272,13 @@ export class RoomEditor {
   confirmReset() {
     const dialog=document.createElement('dialog');dialog.className='room-reset-dialog';
     dialog.setAttribute('role','alertdialog');dialog.setAttribute('aria-labelledby','room-reset-title');dialog.setAttribute('aria-describedby','room-reset-warning');
-    const source=this.worldClient?'当前游戏版本随附的默认布局':'本次打开游戏时载入的布局';
-    dialog.innerHTML=`<h2 id="room-reset-title">⚠ 危险操作：恢复默认布局</h2><p data-scene></p><div id="room-reset-warning"><strong>当前自定义家具和摆放修改将被替换！</strong><p>恢复到${source}，并在校验通过后覆盖当前场景的数据库存档。其他场景不受影响。</p><p>请先取消并使用「导出布局」备份，不要依赖撤销来恢复。</p></div><label>确认继续，请输入「恢复默认」<input data-ack autocomplete="off" spellcheck="false" placeholder="恢复默认"></label><footer><button data-cancel type="button">取消，保留当前布置</button><button data-confirm type="button" disabled>确认覆盖当前布局</button></footer>`;
+    const scope=this.worldClient?'卧室、客厅、院子、便利店和森林':this.context?.label||'当前场景';
+    const description=this.worldClient
+      ?'用当前版本的默认布局覆盖这些场景的数据库存档，并接通院子的森林入口。'
+      :'恢复到本次打开游戏时载入的布局，并在校验通过后覆盖当前场景的数据库存档。';
+    dialog.innerHTML=`<h2 id="room-reset-title">⚠ 危险操作：恢复默认布局</h2><p data-scene></p><div id="room-reset-warning"><strong>当前自定义家具和摆放修改将被替换！</strong><p>${description}</p><p>请先取消并使用「导出布局」备份，不要依赖撤销来恢复。</p></div><label>确认继续，请输入「恢复默认」<input data-ack autocomplete="off" spellcheck="false" placeholder="恢复默认"></label><footer><button data-cancel type="button">取消，保留当前布置</button><button data-confirm type="button" disabled>确认覆盖${this.worldClient?'全部内置布局':'当前布局'}</button></footer>`;
     dialog.addEventListener('keydown',event=>event.stopPropagation());
-    dialog.querySelector('[data-scene]').textContent=`操作范围：${this.context?.label||'当前场景'}`;
+    dialog.querySelector('[data-scene]').textContent=`操作范围：${scope}`;
     document.body.append(dialog);const input=dialog.querySelector('[data-ack]'),confirm=dialog.querySelector('[data-confirm]'),cancel=dialog.querySelector('[data-cancel]');
     return new Promise(resolve=>{const finish=value=>{dialog.close();dialog.remove();resolve(value);};input.oninput=()=>{confirm.disabled=input.value.trim()!=='恢复默认';};confirm.onclick=()=>{if(input.value.trim()==='恢复默认')finish(true);};cancel.onclick=()=>finish(false);dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false);});dialog.showModal();cancel.focus();});
   }

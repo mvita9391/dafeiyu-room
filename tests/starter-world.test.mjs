@@ -6,6 +6,7 @@ import {migrateWorld} from '../server/storage/migrations.js';
 import {defaultManifest} from '../shared/world/default-manifest.js';
 import {WorldService} from '../server/world/service.js';
 import {createBuildHandlers} from '../server/world/build.js';
+import {sceneRoute} from '../shared/world/navigation.js';
 
 test('published baseline initializes four scenes with the frozen current furniture transforms',()=>{
  const db=new DatabaseSync(':memory:');try{migrateWorld(db);const s=JSON.parse(db.prepare('SELECT snapshot FROM worlds').get().snapshot);assert.deepEqual(s.scenes.map(x=>x.sceneId),['bedroom','living','yard','convenience-store']);assert.equal(s.entities.length,defaultManifest.scenes.flatMap(s=>s.entities).length);assert.deepEqual(s.entities.find(x=>x.sceneId==='bedroom'&&x.type==='lamp').position,[2.8156056539568857,0,-2.9751997140431956]);assert.deepEqual(s.entities.find(x=>x.type==='yardPool').position,[12.61,0,9.59]);assert.equal(s.entities.find(x=>x.type==='yardFarm').plots.length,9);assert.equal(s.actors[0].sceneId,'bedroom');assert.equal(s.actors[0].controller,null);assert.equal(s.actors[0].position[1],0);}finally{db.close();}
@@ -13,7 +14,7 @@ test('published baseline initializes four scenes with the frozen current furnitu
 test('AI construction stays in its save; restarting with newer defaults never overwrites it',()=>{
  const file=new URL('../shared/world/starter-world.json',import.meta.url);const before=readFileSync(file,'utf8');const db=new DatabaseSync(':memory:');try{migrateWorld(db);const svc=new WorldService(db,{handlers:createBuildHandlers()});const p={subjectId:'agent',role:'agent',worldIds:['default'],actorIds:['whale'],scopes:['world:read','build:write']};let n=0;const run=(kind,payload)=>svc.execute(p,{worldId:'default',requestId:`starter-${++n}`,kind,payload});const plan=run('build.preview',{baseRevision:0,ops:[{kind:'scene.create',ref:'ai-room',templateId:'cozy_room_v1',name:'AI的新房间'}]});run('build.apply',{planId:plan.planId});const saved=db.prepare('SELECT snapshot FROM worlds').get().snapshot;const changed=structuredClone(defaultManifest);changed.scenes[0].name='新版默认卧室';assert.equal(migrateWorld(db,{defaultManifest:changed}).imported,false);assert.equal(db.prepare('SELECT snapshot FROM worlds').get().snapshot,saved);assert.equal(JSON.parse(saved).scenes.length,5);assert.equal(readFileSync(file,'utf8'),before);}finally{db.close();}
 });
-test('an old save can restore the published courtyard without changing other scenes or farm plots',()=>{
+test('restoring an old courtyard installs its forest gate and preserves other layouts and farm plots',()=>{
  const db=new DatabaseSync(':memory:');
  try{
   const old=structuredClone(defaultManifest);
@@ -33,12 +34,73 @@ test('an old save can restore the published courtyard without changing other sce
    .map(({type,position,rotation,scale})=>({type,position,rotation,scale}));
   assert.deepEqual(courtyardLayout,defaultManifest.scenes.find(scene=>scene.sceneId==='yard').entities);
   assert.deepEqual(after.entities.filter(entity=>entity.sceneId!=='yard'),before.entities.filter(entity=>entity.sceneId!=='yard'));
-  assert.deepEqual(after.portals,before.portals);
+  assert.deepEqual(after.portals.slice(0,before.portals.length),before.portals);
+  const forest=after.scenes.find(scene=>scene.templateId==='forest_v1');
+  assert.equal(forest.status,'active');
+  assert.equal(sceneRoute(after,'yard',forest.sceneId).length,1);
+  assert.equal(sceneRoute(after,forest.sceneId,'yard').length,1);
+  service.execute(owner,{...command,requestId:'restore-again',payload:{...command.payload,baseRevision:after.layoutRevision}});
+  assert.deepEqual(service.readSnapshot('default').portals,after.portals);
   const oldFarm=before.entities.find(entity=>entity.type==='yardFarm'),farm=after.entities.find(entity=>entity.type==='yardFarm');
   assert.equal(farm.entityId,oldFarm.entityId);
   assert.deepEqual(farm.plots,oldFarm.plots);
   assert.notEqual(farm.protectionFingerprint,oldFarm.protectionFingerprint);
   assert.throws(()=>service.execute(owner,{...command,requestId:'stale-reset'}),/REVISION_CONFLICT/);
+ }finally{db.close();}
+});
+test('restoring the courtyard connects the forest already created by fast travel',()=>{
+ const db=new DatabaseSync(':memory:');
+ try{
+  migrateWorld(db);
+  const service=new WorldService(db,{handlers:createBuildHandlers()});
+  service.transactRuntime('default',({snapshot})=>{
+   snapshot.scenes.push({sceneId:'existing-forest',templateId:'forest_v1',name:'我的森林',status:'active'});
+   snapshot.features={quickTravelForestId:'existing-forest'};
+  });
+  const owner={subjectId:'owner',role:'owner',worldIds:['default'],scopes:['build:write']};
+  service.execute(owner,{worldId:'default',requestId:'restore',kind:'build.resetScene',payload:{sceneId:'yard',baseRevision:0}});
+  const snapshot=service.readSnapshot('default');
+  assert.deepEqual(snapshot.scenes.filter(scene=>scene.templateId==='forest_v1').map(scene=>scene.sceneId),['existing-forest']);
+  assert.equal(sceneRoute(snapshot,'yard','existing-forest').length,1);
+ }finally{db.close();}
+});
+test('restoring the world from any scene replaces every built-in layout, including forest furniture',()=>{
+ const db=new DatabaseSync(':memory:');
+ try{
+  migrateWorld(db);
+  const service=new WorldService(db,{handlers:createBuildHandlers()});
+  service.transactRuntime('default',({snapshot})=>{
+   snapshot.scenes.push(
+    {sceneId:'existing-forest',templateId:'forest_v1',name:'森林',status:'active'},
+    {sceneId:'custom-room',templateId:'cozy_room_v1',name:'自建房间',status:'draft'},
+   );
+   snapshot.actors[0].sceneId='existing-forest';
+   snapshot.actors[0].position=[-29.8,0,0];
+   snapshot.entities.push(
+    {entityId:'forest-prop',sceneId:'existing-forest',type:'yardLantern',position:[-28,0,2],rotation:0,scale:[1,1,1]},
+    {entityId:'custom-prop',sceneId:'custom-room',type:'lamp',position:[1,0,1],rotation:0,scale:[1,1,1]},
+   );
+   for(const {sceneId} of defaultManifest.scenes){
+    const entity=snapshot.entities.find(entity=>entity.sceneId===sceneId&&!entity.protected);
+    entity.position[0]+=.5;
+   }
+  });
+  const owner={subjectId:'owner',role:'owner',worldIds:['default'],scopes:['build:write']};
+  const command={worldId:'default',requestId:'restore-world',kind:'build.resetWorld',payload:{baseRevision:0}};
+  assert.throws(()=>service.execute({...owner,role:'agent'},command),/UNAUTHORIZED/);
+  const result=service.execute(owner,command);
+  assert.deepEqual(service.execute(owner,command),result);
+  const snapshot=service.readSnapshot('default');
+  for(const baseline of defaultManifest.scenes){
+   const layout=snapshot.entities.filter(entity=>entity.sceneId===baseline.sceneId)
+    .map(({type,position,rotation,scale})=>({type,position,rotation,scale}));
+   assert.deepEqual(layout,baseline.entities);
+  }
+  assert.deepEqual(snapshot.scenes.filter(scene=>scene.templateId==='forest_v1').map(scene=>scene.sceneId),['existing-forest']);
+  assert.ok(!snapshot.entities.some(entity=>entity.sceneId==='existing-forest'));
+  assert.ok(snapshot.entities.some(entity=>entity.entityId==='custom-prop'));
+  assert.equal(sceneRoute(snapshot,'yard','existing-forest').length,1);
+  assert.equal(snapshot.layoutRevision,1);
  }finally{db.close();}
 });
 test('publisher whitelists only layout fields and excludes runtime identity, credentials and actor state',async()=>{

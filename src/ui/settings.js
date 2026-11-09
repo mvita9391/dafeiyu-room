@@ -29,7 +29,7 @@ export function mountSettings({ toolbar = document.body, onOpen, onConnect, canR
     <button class="btn settings-action" id="settings-connect" type="button">连接智能体</button>
   </div>
   <div class="settings-row">
-    <div><h3>家具布局</h3><p>恢复当前场景的家具摆放</p></div>
+    <div><h3>场景布局</h3><p>恢复全部内置场景，包括森林</p></div>
     <button class="btn settings-action settings-reset" type="button" aria-haspopup="dialog">恢复默认</button>
   </div></div>`;
   toolbar.append(entry);
