@@ -4,7 +4,9 @@
 
 **作者 / 抖音：破晓手记**
 
-![大肥鱼和伙伴白泽走进林间高草](docs/screenshots/forest-grass.webp)
+| 房间 | 技能 | 便利店 |
+| --- | --- | --- |
+| ![大肥鱼的卧室](docs/screenshots/room.webp) | ![大肥鱼在院子里施放冰晶王冠](docs/screenshots/cover.webp) | ![街角便利店](docs/screenshots/store.webp) |
 
 ## 开始游戏
 
@@ -56,6 +58,8 @@ npm run desktop:dev
 
 从森林入口沿路往里走，踏进路边的大片高草，在草里多走几步就有机会遇到野生白泽。遇敌后会切入独立的对战画面，大肥鱼站后排，伙伴白泽站前排，对面可能同时出现多只野生白泽。
 
+![大肥鱼和伙伴白泽走进林间高草](docs/screenshots/forest-grass.webp)
+
 1. 双方就位后开始读秒，每回合有 **30 秒**。点击敌人的模型或名牌，打开大肥鱼的技能菜单。
 2. 鼠标移到技能上，敌人脚下会亮起对应的单体、T 字范围或全体目标。选好大肥鱼的技能后，再给白泽选招，并点击敌人确认目标。
 3. 指令选齐或倒计时结束后结算回合。超时还没收到指令的单位本回合待命。击败敌方后会自动回到森林，也可以选择逃跑。
@@ -76,13 +80,11 @@ npm run desktop:dev
 
 ### 游戏截图
 
-| 卧室 | 客厅 | 街角便利店 |
-| --- | --- | --- |
-| ![卧室](docs/screenshots/room.webp) | ![客厅](docs/screenshots/living.webp) | ![街角便利店](docs/screenshots/store.webp) |
-| **院子** | **泳池变身** | **家具编辑** |
-| ![院子](docs/screenshots/yard.webp) | ![泳池变身](docs/screenshots/pool.webp) | ![家具编辑](docs/screenshots/editor.webp) |
-
-![大肥鱼在院子里施放冰晶王冠，三个训练木桩同时跳出伤害数字](docs/screenshots/cover.webp)
+| 客厅 | 院子 |
+| --- | --- |
+| ![客厅](docs/screenshots/living.webp) | ![院子](docs/screenshots/yard.webp) |
+| **泳池变身** | **家具编辑** |
+| ![泳池变身](docs/screenshots/pool.webp) | ![家具编辑](docs/screenshots/editor.webp) |
 
 ## MCP · 带你的智能体来串门
 
