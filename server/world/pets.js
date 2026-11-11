@@ -2,7 +2,7 @@ import {PET_BOND_MAX, PET_BOND_HOURLY_CAP} from '../../shared/creatures/stats.js
 import {normalizePetInstance,createPetInstance} from '../../shared/creatures/instance.js';
 import {getSpecies} from '../../shared/creatures/species.js';
 import {EGG_CATALOG_VERSION,initialEggs,upgradeEggs} from '../../shared/creatures/eggs.js';
-import {settlePetPoops} from '../../shared/creatures/poop.js';
+import {settlePetPoops,PET_POOP_SPEEDS,petPoopInterval} from '../../shared/creatures/poop.js';
 import {addPoopGroundItem} from './items.js';
 import {randomUUID} from 'node:crypto';
 import {normalizeRoster, setFollowPet, setBattlePet} from '../../shared/creatures/roster.js';
@@ -155,6 +155,18 @@ export const petHandlers={
   }
   if(items.length)emit('items.updated',{actorId,kind:'pet-poop',count:items.length});
   return {count:items.length,items:items.map(item=>item.id),pets:plans.map(plan=>({petId:plan.pet.petId,count:plan.count}))};
+ },
+
+ 'pet.setPoopSpeed':({snapshot,command,principal,now,emit})=>{
+  const {actorId,petId,speed}=command.payload;
+  actorOf(snapshot,actorId);
+  const pet=ownedPet(snapshot,actorId,petId);
+  if(!Object.hasOwn(PET_POOP_SPEEDS,speed))throw Error('INVALID_POOP_SPEED');
+  pet.poopSpeed=speed;
+  pet.lastPoopAt=now;
+  pet.nextPoopAt=now+petPoopInterval(pet);
+  emit('pets.poop_speed',{actorId,petId,speed,nextPoopAt:pet.nextPoopAt});
+  return {ok:true,petId,speed,nextPoopAt:pet.nextPoopAt,intervalMs:petPoopInterval(pet)};
  },
 
  'pet.feed':({snapshot,command,principal,now,emit})=>{

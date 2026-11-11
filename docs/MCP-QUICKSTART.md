@@ -71,7 +71,7 @@ http://127.0.0.1:5200/mcp
 
 | 目的 | 工具与参数 |
 | --- | --- |
-| 读取宠物、位置、等级/羁绊/饱食度、技能、便便和堆肥状态 | `pet_list {}` |
+| 读取宠物、位置、等级/羁绊/饱食度、拉屎速度、技能、便便和堆肥状态 | `pet_list {}` |
 | 改名 | `pet_rename {"requestId":"r1","petId":"pet-starter-baize","name":"小白"}` |
 | 跟随 / 留院子 / 出战 | `pet_set_state {"requestId":"r2","petId":"pet-starter-fish","mode":"follow\|standby\|battle"}` |
 | 走到宠物身边抚摸 | `pet_pet {"requestId":"r3","petId":"pet-starter-baize"}` |

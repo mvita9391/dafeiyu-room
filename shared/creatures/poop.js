@@ -1,11 +1,20 @@
 // 宠物便便时间属于宠物领域：只负责“在哪个场景、该不该拉、该拉几次”。
 // 世界/物品层负责生成地面便便，客户端只负责显示。
-export const PET_POOP_MIN_MS = 240_000;
-export const PET_POOP_MAX_MS = 480_000;
+export const PET_POOP_SPEEDS = Object.freeze({
+ slow: Object.freeze({id: 'slow', label: '慢', duration: '8小时', intervalMs: 8 * 60 * 60 * 1000}),
+ normal: Object.freeze({id: 'normal', label: '中', duration: '2小时', intervalMs: 2 * 60 * 60 * 1000}),
+ fast: Object.freeze({id: 'fast', label: '快', duration: '10分钟', intervalMs: 10 * 60 * 1000}),
+});
+export const PET_POOP_DEFAULT_SPEED = 'normal';
 export const PET_POOP_OFFLINE_CAP = 2;
 
-export function randomPoopDelay(random = Math.random) {
-  return PET_POOP_MIN_MS + random() * (PET_POOP_MAX_MS - PET_POOP_MIN_MS);
+export function petPoopSpeed(pet) {
+  const speed = pet?.poopSpeed;
+  return Object.hasOwn(PET_POOP_SPEEDS, speed) ? speed : PET_POOP_DEFAULT_SPEED;
+}
+
+export function petPoopInterval(pet) {
+  return PET_POOP_SPEEDS[petPoopSpeed(pet)].intervalMs;
 }
 
 /** 宠物当前所在场景：战斗中没有；跟随跟随玩家；其他按家园场景。 */
@@ -15,10 +24,10 @@ export function resolvePetScene(pet, roster, actor) {
   return pet.homeSceneId ?? 'yard';
 }
 
-function resetSchedule(pet, sceneId, now, random) {
+function resetSchedule(pet, sceneId, now) {
   pet.poopSceneId = sceneId;
   pet.lastPoopAt = now;
-  pet.nextPoopAt = now + randomPoopDelay(random);
+  pet.nextPoopAt = now + petPoopInterval(pet);
 }
 
 /**
@@ -27,11 +36,19 @@ function resetSchedule(pet, sceneId, now, random) {
  * 返回 [{pet, count}]；调用方负责在场景里放便便。
  */
 export function settlePetPoops({
-  pets, roster, actor, sceneId, now = Date.now(), random = Math.random, maxOffline = PET_POOP_OFFLINE_CAP,
+  pets, roster, actor, sceneId, now = Date.now(), maxOffline = PET_POOP_OFFLINE_CAP,
   poopScenes = ['yard'],
 } = {}) {
   const spawned = [];
   for (const pet of pets ?? []) {
+    // 旧存档没有速度字段：补默认中档，并从现在开始重排，避免第一次仍按旧排程排便。
+    if (!Object.hasOwn(PET_POOP_SPEEDS, pet.poopSpeed)) {
+      pet.poopSpeed = PET_POOP_DEFAULT_SPEED;
+      if (Number.isFinite(pet.lastPoopAt) || Number.isFinite(pet.nextPoopAt)) {
+        pet.lastPoopAt = now;
+        pet.nextPoopAt = now + petPoopInterval(pet);
+      }
+    }
     const scene = resolvePetScene(pet, roster, actor);
     if (pet.poopSceneId !== scene) {
       if (scene === null) {
@@ -39,21 +56,22 @@ export function settlePetPoops({
         pet.lastPoopAt = null;
         pet.nextPoopAt = null;
       } else {
-        resetSchedule(pet, scene, now, random);
+        resetSchedule(pet, scene, now);
       }
       continue;
     }
     if (scene !== sceneId) continue;
     if (!poopScenes.includes(sceneId)) continue;
     if (!Number.isFinite(pet.lastPoopAt) || !Number.isFinite(pet.nextPoopAt)) {
-      resetSchedule(pet, scene, now, random);
+      resetSchedule(pet, scene, now);
       continue;
     }
     if (now < pet.nextPoopAt) continue;
-    const missed = Math.floor((now - pet.nextPoopAt) / PET_POOP_MIN_MS) + 1;
+    const interval = petPoopInterval(pet);
+    const missed = Math.floor((now - pet.nextPoopAt) / interval) + 1;
     const count = Math.max(1, Math.min(Math.floor(maxOffline), missed));
     pet.lastPoopAt = now;
-    pet.nextPoopAt = now + randomPoopDelay(random);
+    pet.nextPoopAt = now + interval;
     spawned.push({pet, count});
   }
   return spawned;

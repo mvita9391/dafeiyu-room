@@ -169,3 +169,102 @@ test('文件世界的位置上报走内存不写命令回执',()=>{
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM command_results').get().count,before);
  }finally{db.close();}
 });
+
+test('宠物拉屎速度可切换并重排下一次时间',()=>{
+ const {db,service,actorId,principal}=setup();
+ try{
+  cmd(service,principal,'pet.bootstrap',{actorId});
+  const petId=cmd(service,principal,'pet.hatchEgg',{actorId,eggId:'starter-baize'}).petId;
+  let result=cmd(service,principal,'pet.setPoopSpeed',{actorId,petId,speed:'slow'});
+  assert.equal(result.speed,'slow');
+  assert.equal(result.intervalMs,8*60*60*1000);
+  assert.equal(result.nextPoopAt-result.intervalMs,service.readSnapshot('default').pets.owners[actorId].instances[petId].lastPoopAt);
+  result=cmd(service,principal,'pet.setPoopSpeed',{actorId,petId,speed:'normal'});
+  assert.equal(result.intervalMs,2*60*60*1000);
+  result=cmd(service,principal,'pet.setPoopSpeed',{actorId,petId,speed:'fast'});
+  assert.equal(result.intervalMs,10*60*1000);
+  assert.throws(()=>cmd(service,principal,'pet.setPoopSpeed',{actorId,petId,speed:'broken'}),/INVALID_COMMAND|INVALID_POOP_SPEED/);
+ }finally{db.close();}
+});
+
+test('空的排便结算不写快照和命令回执',()=>{
+ const {db,service,actorId,principal}=setup();
+ try{
+  cmd(service,principal,'pet.import',{actorId,pets:[{petId:'p1',speciesId:'baize'}],followPetId:'p1'});
+  service.transactRuntime('default',({snapshot})=>{const a=snapshot.actors.find(x=>x.actorId===actorId);a.sceneId='yard';a.position=[5,0,1];});
+  cmd(service,principal,'pet.settlePoops',{actorId,sceneId:'yard'});
+  const before=db.prepare('SELECT COUNT(*) AS count FROM command_results').get().count;
+  const snapshotBefore=db.prepare('SELECT snapshot FROM worlds LIMIT 1').get().snapshot;
+  const result=cmd(service,principal,'pet.settlePoops',{actorId,sceneId:'yard'});
+  assert.equal(result.count,0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM command_results').get().count,before);
+  assert.equal(db.prepare('SELECT snapshot FROM worlds LIMIT 1').get().snapshot,snapshotBefore);
+ }finally{db.close();}
+});
+
+test('排便结算成功后用同一 requestId 重试保留原结果',()=>{
+ const {db,service,actorId,principal}=setup();
+ try{
+  cmd(service,principal,'pet.import',{actorId,pets:[{petId:'p1',speciesId:'baize'}],followPetId:'p1'});
+  service.transactRuntime('default',({snapshot})=>{const a=snapshot.actors.find(x=>x.actorId===actorId);a.sceneId='yard';a.position=[5,0,1];});
+  cmd(service,principal,'pet.settlePoops',{actorId,sceneId:'yard'});
+  service.transactRuntime('default',({snapshot})=>{const p=snapshot.pets.owners[actorId].instances.p1;p.nextPoopAt=Date.now()-1;});
+  const requestId='settle-retry';
+  const first=service.execute(principal,{kind:'pet.settlePoops',worldId:'default',requestId,payload:{actorId,sceneId:'yard'}});
+  assert.ok(first.count>=1);
+  const receipts=db.prepare('SELECT COUNT(*) AS count FROM command_results WHERE request_id=?').get(requestId).count;
+  const second=service.execute(principal,{kind:'pet.settlePoops',worldId:'default',requestId,payload:{actorId,sceneId:'yard'}});
+  assert.deepEqual(second,first);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM command_results WHERE request_id=?').get(requestId).count,receipts);
+ }finally{db.close();}
+});
+
+test('空排便结算同 requestId 重试保持空结果',()=>{
+ const {db,service,actorId,principal}=setup();
+ try{
+  cmd(service,principal,'pet.import',{actorId,pets:[{petId:'p1',speciesId:'baize'}],followPetId:'p1'});
+  service.transactRuntime('default',({snapshot})=>{const a=snapshot.actors.find(x=>x.actorId===actorId);a.sceneId='yard';a.position=[5,0,1];});
+  // 先初始化排程，让随后这次结算进入真正的空预检（而不是初始化写盘）。
+  cmd(service,principal,'pet.settlePoops',{actorId,sceneId:'yard'});
+  const requestId='empty-retry';
+  const first=service.execute(principal,{kind:'pet.settlePoops',worldId:'default',requestId,payload:{actorId,sceneId:'yard'}});
+  assert.equal(first.count,0);
+  service.transactRuntime('default',({snapshot})=>{const p=snapshot.pets.owners[actorId].instances.p1;p.nextPoopAt=Date.now()-1;});
+  const second=service.execute(principal,{kind:'pet.settlePoops',worldId:'default',requestId,payload:{actorId,sceneId:'yard'}});
+  assert.equal(second.count,0);
+  assert.equal(service.readSnapshot('default').items?.owners?.[actorId]?.groundItems?.length??0,0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM command_results WHERE request_id=?').get(requestId).count,0);
+ }finally{db.close();}
+});
+
+test('排便预检复用移动回执并拒绝 requestId 复用',()=>{
+ const {db,service,actorId,principal}=setup();
+ try{
+  cmd(service,principal,'pet.import',{actorId,pets:[{petId:'p1',speciesId:'baize'}],followPetId:'p1'});
+  const requestId='movement-retry';
+  db.prepare('INSERT INTO movement_receipts VALUES(?,?,?,?,?,?)').run(
+   principal.subjectId,'default',requestId,JSON.stringify({kind:'actor.input'}),JSON.stringify({ok:true}),Date.now()+60000,
+  );
+  assert.throws(()=>service.execute(principal,{kind:'pet.settlePoops',worldId:'default',requestId,payload:{actorId,sceneId:'yard'}}),/REQUEST_ID_REUSED/);
+ }finally{db.close();}
+});
+
+test('排便预检复用内存移动回执',()=>{
+ const {db,service,actorId,principal}=setup();
+ try{
+  cmd(service,principal,'pet.import',{actorId,pets:[{petId:'p1',speciesId:'baize'}],followPetId:'p1'});
+  const requestId='memory-movement-retry';
+  const key=JSON.stringify([principal.subjectId,'default',requestId]);
+  service.bufferedWorlds.set('default',{
+   snapshot:service.readSnapshot('default'),
+   receipts:new Map([[key,{
+    identity:[principal.subjectId,'default',requestId],
+    command:JSON.stringify({kind:'actor.input'}),
+    result:JSON.stringify({ok:true}),
+    expiresAt:Date.now()+60000,
+   }]]),
+   dirty:false,
+  });
+  assert.throws(()=>service.execute(principal,{kind:'pet.settlePoops',worldId:'default',requestId,payload:{actorId,sceneId:'yard'}}),/REQUEST_ID_REUSED/);
+ }finally{db.close();}
+});

@@ -1,5 +1,6 @@
 import {getSpecies} from './species.js';
 import {PET_BOND_MAX} from './stats.js';
+import {petPoopInterval} from './poop.js';
 
 export const PET_LEVEL_MAX=50;
 export const PET_SKILL_SLOT_MAX=4;
@@ -43,6 +44,7 @@ export function createPetInstance({
   lastSceneId:null,
   lastPosition:null,
   poopSceneId:null,
+  poopSpeed:'normal',
   lastPoopAt:null,
   nextPoopAt:null,
   bondWindowStart:Number.isFinite(bondWindowStart)?bondWindowStart:(Number.isFinite(now)?now:Date.now()),
@@ -57,6 +59,7 @@ export function normalizePetInstance(raw,ownerId){
  if(!speciesId)return null;
  const petId=typeof raw.petId==='string'&&raw.petId?raw.petId:null;
  if(!petId)return null;
+ const hadPoopSpeed=Object.hasOwn(raw,'poopSpeed')&&['slow','normal','fast'].includes(raw.poopSpeed);
  const pet=createPetInstance({
   petId,ownerId:raw.ownerId||ownerId,speciesId,
   nickname:typeof raw.nickname==='string'&&raw.nickname?raw.nickname.slice(0,24):null,
@@ -68,8 +71,13 @@ export function normalizePetInstance(raw,ownerId){
  if(Array.isArray(raw.lastPosition)&&raw.lastPosition.length===3&&raw.lastPosition.every(Number.isFinite))pet.lastPosition=raw.lastPosition.slice(0,3);
  if(typeof raw.lastSceneId==='string'&&raw.lastSceneId)pet.lastSceneId=raw.lastSceneId;
  if(typeof raw.poopSceneId==='string'||raw.poopSceneId===null)pet.poopSceneId=raw.poopSceneId;
+ if(raw.poopSpeed==='slow'||raw.poopSpeed==='normal'||raw.poopSpeed==='fast')pet.poopSpeed=raw.poopSpeed;
  if(Number.isFinite(raw.lastPoopAt))pet.lastPoopAt=raw.lastPoopAt;
  if(Number.isFinite(raw.nextPoopAt))pet.nextPoopAt=raw.nextPoopAt;
+ if(!hadPoopSpeed&&(Number.isFinite(raw.lastPoopAt)||Number.isFinite(raw.nextPoopAt))){
+  pet.lastPoopAt=Date.now();
+  pet.nextPoopAt=pet.lastPoopAt+petPoopInterval(pet);
+ }
  return pet;
 }
 

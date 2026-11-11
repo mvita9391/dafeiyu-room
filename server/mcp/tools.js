@@ -122,7 +122,8 @@ export function createToolCaller(service,{resolvePrincipal,extensions={},advance
  function petView(pet){
   const stats=deriveStats(pet.speciesId,pet.level,pet.bond,pet.evolved);
   const skills=(pet.skillLoadout??[]).map(skillId=>PET_SKILLS[skillId]).filter(Boolean).map(skill=>({id:skill.id,name:skill.name,kind:skill.kind,power:skill.power}));
-  return {petId:pet.petId,name:pet.nickname,speciesId:pet.speciesId,level:pet.level,bond:pet.bond,satiety:pet.satiety??0,evolved:pet.evolved,sceneId:pet.lastSceneId||pet.homeSceneId,position:pet.lastPosition||pet.homePosition,stats,skills};
+  const speed=pet.poopSpeed in PET_POOP_SPEEDS?pet.poopSpeed:'normal';
+  return {petId:pet.petId,name:pet.nickname,speciesId:pet.speciesId,level:pet.level,bond:pet.bond,satiety:pet.satiety??0,evolved:pet.evolved,sceneId:pet.lastSceneId||pet.homeSceneId,position:pet.lastPosition||pet.homePosition,poopSpeed:speed,poopIntervalMs:petPoopInterval(pet),stats,skills};
  }
  if(extensions[name])return extensions[name]({principal:p,worldId,args:a,service});
  switch(name){

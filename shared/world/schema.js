@@ -59,6 +59,7 @@ export const commandSchema=z.discriminatedUnion('kind',[
  cmd('item.compost',obj({actorId:idSchema})),
  cmd('item.collect',obj({actorId:idSchema})),
  cmd('pet.settlePoops',obj({actorId:idSchema,sceneId:idSchema})),
+ cmd('pet.setPoopSpeed',obj({actorId:idSchema,petId:idSchema,speed:z.enum(['slow','normal','fast'])})),
  cmd('pet.feed',obj({actorId:idSchema,petId:idSchema,foodId:idSchema.optional()})),
  cmd('pet.rename',obj({actorId:idSchema,petId:idSchema,name:z.string().min(1).max(24)})),
  cmd('pet.syncPositions',obj({actorId:idSchema,positions:z.array(obj({petId:idSchema,sceneId:idSchema,position:vectorSchema})).max(20)})),

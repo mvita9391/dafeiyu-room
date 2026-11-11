@@ -13,6 +13,7 @@ import {
 import {deriveStats} from '../../shared/creatures/stats.js';
 import {getSpecies} from '../../shared/creatures/species.js';
 import {PET_SKILLS} from '../../shared/creatures/skills.js';
+import {PET_POOP_SPEEDS} from '../../shared/creatures/poop.js';
 
 const HOME_SCENE_ID = 'yard';
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -51,6 +52,12 @@ const STYLE = `
   padding:0 11px;min-height:38px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
 .pet-battle:hover:not(.active){background:#fff0d8}
 .pet-battle.active{background:#8b4d37;border-color:#8b4d37;color:#fff;font-weight:600}
+.pet-speed{display:flex;align-items:center;gap:7px;margin:7px 0 2px;font-size:11px;color:#8a7563;flex-wrap:wrap}
+.pet-speed-options{display:flex;border:1px solid #d6bfa5;border-radius:9px;overflow:hidden;background:#fff9ee}
+.pet-speed-options button{border:0;border-right:1px solid #ead8c2;background:transparent;color:#5d493b;font:inherit;font-size:11px;line-height:1.1;padding:5px 9px;cursor:pointer;min-height:32px}
+.pet-speed-options button:last-child{border-right:0}
+.pet-speed-options button.active{background:#a8794f;color:#fff;font-weight:600}
+.pet-speed-options small{display:block;font-size:9px;opacity:.72;margin-top:2px}
 .pet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 .pet-actions button{padding:6px 12px;border:1px solid #d6bfa5;border-radius:10px;background:#fff9ee;color:#5d493b;font:inherit;font-size:13px;cursor:pointer}
 .pet-actions button:disabled{opacity:.45;cursor:default}
@@ -403,6 +410,24 @@ export function mountPetSystem({
     onMessage(`${pet.name} ${pet.battle ? '出战' : '取消出战'}`);
   }
 
+  async function setPoopSpeed(id, speed) {
+    if (!Object.hasOwn(PET_POOP_SPEEDS, speed)) return;
+    const pet = getPet(state, id);
+    if (!pet) return;
+    if (dispatchPet) {
+      if (!serverReady) { onMessage('宠物数据还在同步，稍等一下'); return; }
+      const result = await petCommand('pet.setPoopSpeed', { petId: id, speed });
+      if (!result?.speed) return;
+      pet.poopSpeed = result.speed;
+      if (Number.isFinite(result.nextPoopAt)) pet.nextPoopAt = result.nextPoopAt;
+    } else {
+      pet.poopSpeed = speed;
+    }
+    save();
+    render();
+    onMessage(`${pet.name} 拉屎速度：${PET_POOP_SPEEDS[speed].label}`);
+  }
+
   function placeFood(foodId) {
     if (!FOODS[foodId]) return;
     if (!ready) { onMessage('宠物们还在赶来的路上，稍等一下'); return; }
@@ -742,6 +767,12 @@ export function mountPetSystem({
     const actor = getActor?.();
     if (!actor?.actorId) return;
     const now = Date.now();
+    // 只有院子里且确实有宠物到期时才请求结算；MCP/场景变化仍会显式触发。
+    if (!force) {
+      if (sceneId !== HOME_SCENE_ID) return;
+      const due = state.pets.some(pet => !Number.isFinite(pet.nextPoopAt) || pet.nextPoopAt <= now);
+      if (!due) return;
+    }
     if (!force && sceneId === lastPoopSettleScene && now - lastPoopSettleAt < 20_000) return;
     lastPoopSettleScene = sceneId;
     lastPoopSettleAt = now;
@@ -818,6 +849,12 @@ export function mountPetSystem({
             </div>
             <button type="button" class="pet-battle${candidate.battle ? ' active' : ''}" data-mode="battle" aria-pressed="${candidate.battle}">⚔ 出战</button>
           </div>
+          <div class="pet-speed" role="group" aria-label="拉屎速度">
+            <span>拉屎速度</span>
+            <div class="pet-speed-options">
+              ${Object.values(PET_POOP_SPEEDS).map(option => `<button type="button" data-poop-speed="${option.id}" class="${(candidate.poopSpeed ?? 'normal') === option.id ? 'active' : ''}" aria-pressed="${(candidate.poopSpeed ?? 'normal') === option.id}">${option.label}<small>${option.duration}</small></button>`).join('')}
+            </div>
+          </div>
           <div class="pet-actions">
             <button type="button" data-action="evolve" class="primary" ${candidate.readyToEvolve ? '' : 'disabled'}>进化</button>
           </div>
@@ -849,8 +886,13 @@ export function mountPetSystem({
   });
   body.addEventListener('click', event => {
     const card = event.target.closest('[data-pet-id]');
+    const speedButton = event.target.closest('button[data-poop-speed]');
     const modeButton = event.target.closest('button[data-mode]');
     const actionButton = event.target.closest('button[data-action]');
+    if (speedButton && card) {
+      void setPoopSpeed(card.dataset.petId, speedButton.dataset.poopSpeed);
+      return;
+    }
     if (modeButton && card) {
       const pet = getPet(state, card.dataset.petId);
       if (!pet) return;

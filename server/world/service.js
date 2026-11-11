@@ -6,6 +6,7 @@ import {protectFarm} from './starter.js';
 import {nearestFree} from '../../shared/world/navigation.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {appendEvent,readEvents,readLatestCursor,projectEventPage} from './events.js';
+import {settlePetPoops} from '../../shared/creatures/poop.js';
 const scopeFor=kind=>kind.startsWith('build.')?'build:write':kind.startsWith('control.')||kind.startsWith('action.')||kind.startsWith('actor.')||kind.startsWith('battle.')||kind.startsWith('pet.')||kind.startsWith('item.')?'actor:control':'world:read';
 // Trusted adapter-only principal: {subjectId,worldIds,actorIds,scopes,role,
 // expiresAt?,revoked?}. Never construct this object from command/request JSON.
@@ -15,11 +16,13 @@ export function authorizePrincipal(principal,worldId,scope,actorId,now=Date.now(
 const canonical=value=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
 export const NO_RUNTIME_CHANGE=Symbol('no runtime change');
 const MOVEMENT_RECEIPT_TTL_MS=600_000;
+const EMPTY_SETTLEMENT_TTL_MS=60_000;
 export class WorldService{
  constructor(db,{handlers={},clock=Date.now,memoryPosition=false}={}){
   Object.assign(this,{db,handlers:{...handlers},clock,memoryPosition});
   this.bufferedWorlds=new Map();
   this.livePetPositions=new Map();
+  this.emptySettlements=new Map();
   installConsumers(db);
  }
  writeSnapshot(snapshot){
@@ -121,6 +124,32 @@ export class WorldService{
    return result;
   }catch(error){db.exec('ROLLBACK');throw error;}
  }
+ priorReceipt(principal,worldId,requestId,serialized,now){
+  const identity=[principal.subjectId,worldId,requestId];
+  const key=JSON.stringify(identity);
+  const staged=this.bufferedWorlds.get(worldId)?.receipts.get(key);
+  const db=this.db;
+  const prior=(staged?.expiresAt>now?staged:null)
+   ??db.prepare('SELECT command,result FROM command_results WHERE subject_id=? AND world_id=? AND request_id=?').get(...identity)
+   ??db.prepare('SELECT command,result FROM movement_receipts WHERE subject_id=? AND world_id=? AND request_id=? AND expires_at>?').get(...identity,now);
+  if(prior){
+   if(prior.command!==serialized)throw Error('REQUEST_ID_REUSED');
+   return JSON.parse(prior.result);
+  }
+  const empty=this.emptySettlements.get(key);
+  if(empty){
+   if(empty.expiresAt<=now){this.emptySettlements.delete(key);return null;}
+   if(empty.command!==serialized)throw Error('REQUEST_ID_REUSED');
+   return JSON.parse(empty.result);
+  }
+  return null;
+ }
+ cacheEmptySettlement(principal,worldId,requestId,serialized,result,now){
+  for(const [key,entry] of this.emptySettlements)if(entry.expiresAt<=now)this.emptySettlements.delete(key);
+  this.emptySettlements.set(JSON.stringify([principal.subjectId,worldId,requestId]),{
+   command:serialized,result:JSON.stringify(result),expiresAt:now+EMPTY_SETTLEMENT_TTL_MS,
+  });
+ }
  getSnapshot(principal,worldId){authorizePrincipal(principal,worldId,'world:read',undefined,this.clock());const snapshot=this.readSnapshot(worldId);this.applyLivePetPositions(snapshot,worldId);return snapshot;}
  applyLivePetPositions(snapshot,worldId){
   const world=this.livePetPositions.get(worldId);
@@ -170,6 +199,26 @@ export class WorldService{
   if(!validateCommand(command).ok)throw Error('INVALID_COMMAND');
   authorizePrincipal(principal,command.worldId,scopeFor(command.kind),command.payload.actorId,this.clock());
   if((['control.takeover','actor.teleport'].includes(command.kind)||command.kind.startsWith('battle.'))&&principal.role!=='owner')throw Error('UNAUTHORIZED');
+  if(command.kind==='pet.settlePoops'){
+   // 先查历史回执（含内存/ SQLite 移动回执和空结算短期缓存），避免重试被空结算预检吞掉。
+   const serialized=canonical(command);
+   const prior=this.priorReceipt(principal,command.worldId,command.requestId,serialized,this.clock());
+   if(prior)return prior;
+   const snapshot=this.readSnapshot(command.worldId);
+   const actor=snapshot.actors?.find(entry=>entry.actorId===command.payload.actorId);
+   if(actor){
+    const owner=snapshot.pets?.owners?.[command.payload.actorId];
+    const before=JSON.stringify(Object.values(owner?.instances??{}).map(pet=>[pet.petId,pet.poopSceneId,pet.poopSpeed,pet.lastPoopAt,pet.nextPoopAt]));
+    const probe=structuredClone(owner?.instances??{});
+    const plans=settlePetPoops({pets:Object.values(probe),roster:owner?.roster,actor,sceneId:command.payload.sceneId,now:this.clock()});
+    const after=JSON.stringify(Object.values(probe).map(pet=>[pet.petId,pet.poopSceneId,pet.poopSpeed,pet.lastPoopAt,pet.nextPoopAt]));
+    if(!plans.length&&before===after){
+     const result={count:0,items:[],pets:[],requestId:command.requestId,worldId:command.worldId};
+     this.cacheEmptySettlement(principal,command.worldId,command.requestId,serialized,result,this.clock());
+     return result;
+    }
+   }
+  }
   if(command.kind==='pet.syncPositions'&&this.memoryPosition)return this.rememberLivePetPositions(principal,command.worldId,command);
   const movement=command.kind==='actor.input';
   const canBuffer=movement&&this.memoryPosition;
@@ -180,10 +229,8 @@ export class WorldService{
    const {worldId}=command;
    const identity=[principal.subjectId,worldId,command.requestId];
    const receiptKey=JSON.stringify(identity);
-   const staged=this.bufferedWorlds.get(worldId)?.receipts.get(receiptKey);
-   const prior=(staged?.expiresAt>now?staged:null)??db.prepare('SELECT command,result FROM command_results WHERE subject_id=? AND world_id=? AND request_id=?').get(...identity)
-    ??db.prepare('SELECT command,result FROM movement_receipts WHERE subject_id=? AND world_id=? AND request_id=? AND expires_at>?').get(...identity,now);
-   if(prior){if(prior.command!==serialized)throw Error('REQUEST_ID_REUSED');db.exec('COMMIT');return JSON.parse(prior.result);}
+   const prior=this.priorReceipt(principal,worldId,command.requestId,serialized,now);
+   if(prior){db.exec('COMMIT');return prior;}
    const snapshot=this.readSnapshot(command.worldId);const handler=this.handlers[command.kind];if(!handler)throw Error('NOT_IMPLEMENTED');
    const {actorId}=command.payload;
    if(actorId&&!command.kind.startsWith('battle.')&&snapshot.actors.some(actor=>actor.actorId===actorId&&actor.battle))throw Error('ACTOR_IN_BATTLE');
