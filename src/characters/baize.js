@@ -151,6 +151,7 @@ export function createBaizeFollower(scene){
    scene.add(model.root);
   },
   reset(){sceneId=null;},
+  hide(){if(model)model.root.visible=false;},
   update(dt,snapshot,actor,renderPosition){
    if(!model||!actor||!snapshot)return;
    const entry=snapshot.scenes.find(scene=>scene.sceneId===actor.sceneId);

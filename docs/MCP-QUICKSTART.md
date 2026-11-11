@@ -65,6 +65,24 @@ http://127.0.0.1:5200/mcp
 
 `yard` 仅是初始场景的示例 ID；新增场景使用观察返回的 ID。布置建议可能没有候选方案，且不会自动应用。
 
+## 4.1 宠物与院子
+
+宠物和院子工具需要 `actor:control`，只能操作凭证授权的角色。读取类工具不会移动角色；带“走过去”的工具会在一次调用内完成接近和原子状态变更，并自动取得/归还控制租约。
+
+| 目的 | 工具与参数 |
+| --- | --- |
+| 读取宠物、位置、等级/羁绊/饱食度、技能、便便和堆肥状态 | `pet_list {}` |
+| 改名 | `pet_rename {"requestId":"r1","petId":"pet-starter-baize","name":"小白"}` |
+| 跟随 / 留院子 / 出战 | `pet_set_state {"requestId":"r2","petId":"pet-starter-fish","mode":"follow\|standby\|battle"}` |
+| 走到宠物身边抚摸 | `pet_pet {"requestId":"r3","petId":"pet-starter-baize"}` |
+| 走到宠物身边喂食，增加饱食度 | `pet_feed {"requestId":"r4","petId":"pet-starter-baize"}` |
+| 走到最近的便便并捡起 | `yard_pickup_poop {"requestId":"r5"}`，也可带 `itemId` |
+| 走到堆肥箱并放入便便 | `yard_compost {"requestId":"r6"}` |
+| 走到堆肥箱收取已完成的肥料 | `yard_collect {"requestId":"r7"}` |
+
+位置来自客户端最近一次同步（约 1 秒级）；宠物走动时位置会更新。便便计时、离线补偿和地面便便由服务端宠物领域结算，客户端只触发当前场景结算并显示；`pet_list` 读取前也会结算角色当前场景。背包/堆肥状态存放在世界快照，客户端本地 profile 只是缓存。
+
+
 可选资源 URI：`world://current/rules`、`world://current/map`、`world://current/catalog`、`world://current/activity`。宿主没有资源读取入口时，使用上表普通工具即可。地图是结构化信息，不是摄像头画面；当前 MCP 没有提供截图工具。
 
 ## 5. 行动：取得控制，提交，确认结果

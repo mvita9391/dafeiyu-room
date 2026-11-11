@@ -1,0 +1,55 @@
+{
+  "id": "fish-bowl",
+  "modelId": "fish-bowl",
+  "name": "缸盆小鱼",
+  "species": "fish-bowl",
+  "url": "/resources/character/models/fish-bowl.glb",
+  "animationUrls": [
+    "/resources/character/models/fish-bowl-anims.glb"
+  ],
+  "scale": 0.45,
+  "yOffset": 0,
+  "inPlace": true,
+  "defaultMode": "standby",
+  "animations": {
+    "idle": "HumanSpIdle4",
+    "walk": "HumanSpWalking6",
+    "runSlow": "HumanSpWalking6",
+    "runFast": "HumanSpRun",
+    "attack": "HumanSpBoxing",
+    "hit": "HumanSpHeadHit",
+    "death": "HumanSpZombieStumbling",
+    "yardIdle": [
+      {
+        "clip": "HumanSpIdle4",
+        "duration": 4.0
+      },
+      {
+        "clip": "HumanSpSitups",
+        "duration": 2.6
+      },
+      {
+        "clip": "HumanSpDancingTwerk",
+        "duration": 3.2
+      },
+      {
+        "clip": "HumanSpSitting2",
+        "duration": 2.8
+      },
+      {
+        "clip": "HumanSpQuickRollToRun",
+        "duration": 1.6
+      }
+    ],
+    "pet": [
+      {
+        "clip": "HumanSpForwardJump",
+        "duration": 1.0
+      },
+      {
+        "clip": "HumanSpIdle4",
+        "duration": 1.2
+      }
+    ]
+  }
+}

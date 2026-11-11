@@ -4,6 +4,7 @@ import {clone} from 'three/addons/utils/SkeletonUtils.js';
 import {BATTLE_RUN_DELAY_MS,controlledUnits,FLEE_TURN_SECONDS,FORMATION,skillTargetMode,targetCells} from '/shared/world/baize-battle.js';
 import {SPELL_THROW} from '/shared/world/maneuvers.js';
 import {loadBaize,makeBaize} from '../characters/baize.js';
+import {PET_MODEL_BY_ID,loadPetModelAsset,createPetModel} from '../pets/pet-models.js';
 import {grassTileGeometry} from '../world/forest.js';
 import {PET_SKILLS} from '/shared/world/pet-skills.js';
 import {spawnElementalCast} from '../effects/elemental/casts.js';
@@ -151,24 +152,49 @@ export function createBaizeArena(playSound,character){
   return best??new T.QuadraticBezierCurve3(start,start.clone().lerp(stop,.5),stop);
  }
  let baizeAsset;
+ let fishAsset;
  function syncPets(){
-  if(!battle||!baizeAsset)return;
+  if(!battle)return;
   for(const [id,model] of Object.entries(pets))model.root.visible=Boolean(battle.units[id]);
   for(const unit of Object.values(battle.units)){
-   if(unit.speciesId!=='baize'||pets[unit.id])continue;
+   if(unit.id==='hero'||pets[unit.id])continue;
    const ally=unit.slot.startsWith('ally-');
-   const model=makeBaize(baizeAsset,ally,{inPlace:true,idleOffset:FORMATION.findIndex(slot=>slot.id===unit.slot)*.83});
-   if(!ally&&unit.id!=='wild'){
-    model.root.name=`baize-${unit.id}`;
-    model.root.scale.setScalar(.8);
+   const baizeSpecies=!unit.speciesId||unit.speciesId.startsWith('baize')||unit.modelId==='baize';
+   if(baizeSpecies&&baizeAsset){
+    const model=makeBaize(baizeAsset,ally,{inPlace:true,idleOffset:FORMATION.findIndex(slot=>slot.id===unit.slot)*.83});
+    if(!ally&&unit.id!=='wild'){
+     model.root.name=`baize-${unit.id}`;
+     model.root.scale.setScalar(.8);
+    }
+    model.root.rotation.y=ally?Math.PI/2:-Math.PI/2;
+    pets[unit.id]=model;
+    scene.add(model.root);
+    continue;
    }
+   const config=PET_MODEL_BY_ID[unit.modelId];
+   if(!config||!fishAsset)continue;
+   const model=createPetModel(fishAsset,config);
+   model.root.name=`pet-battle-${unit.id}`;
    model.root.rotation.y=ally?Math.PI/2:-Math.PI/2;
-   pets[unit.id]=model;
+   const wrapper={
+    root:model.root,
+    play(name,duration){
+     if(name==='CanineGallop')model.loop('runFast');
+     else if(name==='CanineDeath2')model.once('death',duration);
+     else if(name==='CanineStand')model.once('attack',duration);
+     else if(name==='CanineIdle'||!name)model.loop('idle');
+     else model.loop('idle');
+    },
+    hit(){model.once('hit');},
+    update(dt){model.update(dt);},
+   };
+   pets[unit.id]=wrapper;
    scene.add(model.root);
   }
  }
  const ready=Promise.all([
   loadBaize().then(asset=>{baizeAsset=asset;syncPets();return Boolean(asset);}),
+  loadPetModelAsset(PET_MODEL_BY_ID['fish-bowl']).then(asset=>{fishAsset=asset;syncPets();return Boolean(asset);}).catch(()=>false),
   Promise.resolve(character?.ready).then(()=>{
    if(!character?.model)return;
    const model=clone(character.model);

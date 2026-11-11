@@ -6,7 +6,7 @@ import {protectFarm} from './starter.js';
 import {nearestFree} from '../../shared/world/navigation.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {appendEvent,readEvents,readLatestCursor,projectEventPage} from './events.js';
-const scopeFor=kind=>kind.startsWith('build.')?'build:write':kind.startsWith('control.')||kind.startsWith('action.')||kind.startsWith('actor.')||kind.startsWith('battle.')?'actor:control':'world:read';
+const scopeFor=kind=>kind.startsWith('build.')?'build:write':kind.startsWith('control.')||kind.startsWith('action.')||kind.startsWith('actor.')||kind.startsWith('battle.')||kind.startsWith('pet.')||kind.startsWith('item.')?'actor:control':'world:read';
 // Trusted adapter-only principal: {subjectId,worldIds,actorIds,scopes,role,
 // expiresAt?,revoked?}. Never construct this object from command/request JSON.
 export function authorizePrincipal(principal,worldId,scope,actorId,now=Date.now()){
@@ -19,6 +19,7 @@ export class WorldService{
  constructor(db,{handlers={},clock=Date.now,memoryPosition=false}={}){
   Object.assign(this,{db,handlers:{...handlers},clock,memoryPosition});
   this.bufferedWorlds=new Map();
+  this.livePetPositions=new Map();
   installConsumers(db);
  }
  writeSnapshot(snapshot){
@@ -120,7 +121,42 @@ export class WorldService{
    return result;
   }catch(error){db.exec('ROLLBACK');throw error;}
  }
- getSnapshot(principal,worldId){authorizePrincipal(principal,worldId,'world:read',undefined,this.clock());return this.readSnapshot(worldId);}
+ getSnapshot(principal,worldId){authorizePrincipal(principal,worldId,'world:read',undefined,this.clock());const snapshot=this.readSnapshot(worldId);this.applyLivePetPositions(snapshot,worldId);return snapshot;}
+ applyLivePetPositions(snapshot,worldId){
+  const world=this.livePetPositions.get(worldId);
+  if(!world)return;
+  for(const [actorId,pets] of world){
+   const owner=snapshot.pets?.owners?.[actorId];
+   if(!owner)continue;
+   for(const [petId,entry] of pets){
+    const pet=owner.instances?.[petId];
+    if(!pet)continue;
+    pet.lastSceneId=entry.sceneId;
+    pet.lastPosition=[...entry.position];
+   }
+  }
+ }
+ rememberLivePetPositions(principal,worldId,command){
+  const snapshot=this.readSnapshot(worldId);
+  const {actorId,positions}=command.payload;
+  const actor=snapshot.actors?.find(entry=>entry.actorId===actorId);
+  if(!actor)throw Error('ACTOR_NOT_FOUND');
+  const owner=snapshot.pets?.owners?.[actorId];
+  if(!owner)return {updated:0,requestId:command.requestId,worldId};
+  let world=this.livePetPositions.get(worldId);
+  if(!world){world=new Map();this.livePetPositions.set(worldId,world);}
+  let pets=world.get(actorId);
+  if(!pets){pets=new Map();world.set(actorId,pets);}
+  let updated=0;
+  for(const entry of positions){
+   const pet=owner.instances?.[entry.petId];
+   if(!pet||pet.ownerId!==actorId)continue;
+   if(!Array.isArray(entry.position)||entry.position.length!==3||!entry.position.every(Number.isFinite))continue;
+   pets.set(entry.petId,{sceneId:entry.sceneId,position:entry.position.slice(0,3)});
+   updated+=1;
+  }
+  return {updated,requestId:command.requestId,worldId};
+ }
  readSnapshot(worldId){const buffered=this.bufferedWorlds.get(worldId);if(buffered)return structuredClone(buffered.snapshot);const row=this.db.prepare('SELECT snapshot FROM worlds WHERE world_id=?').get(worldId);if(!row)throw Error('WORLD_NOT_FOUND');return JSON.parse(row.snapshot);}
  latestCursor(principal,worldId){authorizePrincipal(principal,worldId,'world:read',undefined,this.clock());this.readSnapshot(worldId);return readLatestCursor(this.db,worldId);}
  // 实时通道内部使用：不进 consumer 记账，避免影响 MCP 的 ack 水位。
@@ -134,6 +170,7 @@ export class WorldService{
   if(!validateCommand(command).ok)throw Error('INVALID_COMMAND');
   authorizePrincipal(principal,command.worldId,scopeFor(command.kind),command.payload.actorId,this.clock());
   if((['control.takeover','actor.teleport'].includes(command.kind)||command.kind.startsWith('battle.'))&&principal.role!=='owner')throw Error('UNAUTHORIZED');
+  if(command.kind==='pet.syncPositions'&&this.memoryPosition)return this.rememberLivePetPositions(principal,command.worldId,command);
   const movement=command.kind==='actor.input';
   const canBuffer=movement&&this.memoryPosition;
   const serialized=canonical(command);const db=this.db;

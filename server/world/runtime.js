@@ -1,4 +1,6 @@
 import {resolveBaizeTurn} from '../../shared/world/baize-battle.js';
+import {petHandlers} from './pets.js';
+import {itemHandlers} from './items.js';
 import {startBaizeEncounter,baizeHandlers} from './baize.js';
 import {combatTargets,spellImpact} from '../../shared/world/combat-targets.js';
 import {SPELLS} from '../../shared/world/spells.js';
@@ -270,7 +272,7 @@ function startBattle(ctx,enabled){
  if(actor.input?.sequence!==command.payload.sequence)throw Error('INPUT_SEQUENCE');
  return startBaizeEncounter(ctx,actor,enabled);
 }
-export function createRuntimeHandlers({baizeEnabled=false}={}){return {...baizeHandlers,'battle.start':ctx=>startBattle(ctx,baizeEnabled),'actor.teleport':teleport,'actor.input':playerInput,'control.acquire':ctx=>lease(ctx),'control.takeover':ctx=>lease(ctx,true),'control.renew':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);a.controller.expiresAt=ctx.now+leaseDuration(ctx.principal);return {...a.controller};},'control.release':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);if(a.actionId)finish(ctx.snapshot,a,ctx.snapshot.actions[a.actionId],'cancelled',ctx.emit,'control_release');a.controller=null;ctx.emit('control.released',{actorId:a.actorId});return {status:'released'};},'action.submit':submit,'action.task':startTask,'action.cancel':cancelAction};}
+export function createRuntimeHandlers({baizeEnabled=false}={}){return {...baizeHandlers,...petHandlers,...itemHandlers,'battle.start':ctx=>startBattle(ctx,baizeEnabled),'actor.teleport':teleport,'actor.input':playerInput,'control.acquire':ctx=>lease(ctx),'control.takeover':ctx=>lease(ctx,true),'control.renew':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);a.controller.expiresAt=ctx.now+leaseDuration(ctx.principal);return {...a.controller};},'control.release':ctx=>{const a=actorOf(ctx.snapshot,ctx.command.payload.actorId);checkLease(a,ctx.command.payload,ctx.principal,ctx.now);if(a.actionId)finish(ctx.snapshot,a,ctx.snapshot.actions[a.actionId],'cancelled',ctx.emit,'control_release');a.controller=null;ctx.emit('control.released',{actorId:a.actorId});return {status:'released'};},'action.submit':submit,'action.task':startTask,'action.cancel':cancelAction};}
 export class WorldRuntime{
  constructor(service,{worldId='default',intervalMs=100,onError=error=>console.error('World runtime tick failed',error)}={}){this.onError=onError;this.service=service;this.worldId=worldId;this.intervalMs=intervalMs;this.timer=null;}
  start(){if(!this.timer)this.timer=setInterval(()=>{try{this.tick();}catch(error){this.onError?.(error);}},this.intervalMs);this.timer?.unref?.();return this;}

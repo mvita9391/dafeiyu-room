@@ -8,7 +8,7 @@ import {buildServer} from '../server/app.js';
 import {BAIZE_ASSET_URL} from '../shared/world/baize-battle.js';
 test('bundled character manifest authorizes only exact resources and runtime selection is portable',async()=>{
  const manifest=JSON.parse(fs.readFileSync('resources/character/manifest.json','utf8'));
- assert.deepEqual(manifest.files.map(f=>f.path),['resources/character/models/Dafeiyu.glb','resources/character/models/baize.glb']);
+ assert.deepEqual(manifest.files.map(f=>f.path),['resources/character/models/Dafeiyu.glb','resources/character/models/baize.glb','resources/character/models/fish-bowl.glb','resources/character/models/fish-bowl-anims.glb']);
  assert.ok(manifest.files.every(f=>f.runtime===true));
  for(const f of manifest.files){assert.equal(createHash('sha256').update(fs.readFileSync(f.path)).digest('hex'),f.sha256);assert.equal(blockedPublicFile(f.path),false,f.path);}
  for(const p of ['resources/character/models/unknown.glb','resources/character/models/Whale_Maid_Lively.glb','resources/character/characters/whale-maid-paper.png','resources/character/models/Whale_Maid_Lively.blend1','resources/character/models/secrets.json'])assert.equal(blockedPublicFile(p),true,p);

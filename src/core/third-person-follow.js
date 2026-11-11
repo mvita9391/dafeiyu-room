@@ -12,6 +12,8 @@ const lerpAngle = (a, b, t) => a + angleDiff(b, a) * t;
  * - 松开移动后，人物平滑转回移动前的朝向（镜头保持不变）
  * - 未移动时，右键拖动只转镜头
  * - 就座/睡觉/切换场景：采用服务端朝向
+ * - 服务端驱动移动（智能体控制、本地没有键盘输入）：朝向跟随服务端 rotation，
+ *   不能把“本地没输入”误当成“停下”，否则人物会保持旧朝向平移
  */
 export function createThirdPersonFacingState(facing = 0) {
   return { facing, idleFacing: facing, lastSceneId: null, moving: false, returning: false };
@@ -21,8 +23,18 @@ export function createThirdPersonFacingState(facing = 0) {
  * 每帧解析人物朝向。返回的 yaw 原样带回，调用方不需要（也不应该）用它回写镜头。
  * rotation 始终有值：调用方写入 visual.rotation 即可让 presentActor 渲染。
  */
-export function resolveThirdPersonFacing(state, { yaw, moving = false, moveAngle = null, pose = null, sceneId = null, serverRotation = null, dt = 0 } = {}) {
+export function resolveThirdPersonFacing(state, { yaw, moving = false, moveAngle = null, pose = null, sceneId = null, serverRotation = null, serverMoving = false, dt = 0 } = {}) {
   const sceneChanged = sceneId !== null && state.lastSceneId !== null && sceneId !== state.lastSceneId;
+  // 智能体/服务端驱动移动：本地没有 WASD 输入，但人物确实在走，
+  // 此时朝向必须以服务端 rotation 为准（否则会保持旧朝向平移）。
+  if (!moving && serverMoving && Number.isFinite(serverRotation)) {
+    state.facing = serverRotation;
+    state.idleFacing = serverRotation;
+    state.moving = false;
+    state.returning = false;
+    if (sceneId !== null) state.lastSceneId = sceneId;
+    return { yaw, facing: state.facing, rotation: state.facing };
+  }
   if (Number.isFinite(serverRotation) && (sceneChanged || (SEATED_POSES.has(pose) && !moving))) {
     state.facing = serverRotation;
     state.idleFacing = serverRotation;

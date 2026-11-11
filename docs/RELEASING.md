@@ -4,7 +4,7 @@
 
 | 内容 | 公开范围 |
 | --- | --- |
-| 人物和宠物 | 大肥鱼 `Dafeiyu.glb` 和白泽 `baize.glb`，均保留骨骼与动画，由 Vite 按角色清单打包。 |
+| 人物和宠物 | 大肥鱼 `Dafeiyu.glb`、白泽 `baize.glb`、缸盆小鱼 `fish-bowl.glb` 及其动画 `fish-bowl-anims.glb`，由 Vite 按角色清单打包。 |
 | 精选家具模型 | `resources/polyfork/` 中清单列出的 146 个模型、缩略图及 CC BY 4.0 署名。 |
 | 游戏音频 | 游戏使用的角色配音、动作与界面音效、背景音乐统一放在 `resources/audio/`，随仓库和桌面版分发。 |
 | 界面图片和许可文本 | `public/` 中的界面图和许可文本。 |

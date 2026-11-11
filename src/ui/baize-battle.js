@@ -152,7 +152,8 @@ export function mountBaizeBattle(client,{onEnter,onExit,playSound,character}){
    button.className=`baize-unit ${enemy?'enemy':'ally'}`;
    button.classList.toggle('rear',rear);
    button.dataset.unit=unit.id;
-   button.innerHTML=`<b>${unit.name}</b><span></span><i><em></em></i>`;
+   button.innerHTML='<b></b><span></span><i><em></em></i>';
+   button.querySelector('b').textContent=unit.name;
    const height=rear?(unit.speciesId?1.35:2.05):-.03;
    cards.set(unit.id,{button,height,hp:button.querySelector('span'),bar:button.querySelector('em')});
    formation.append(button);

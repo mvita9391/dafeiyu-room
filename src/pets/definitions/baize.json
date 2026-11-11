@@ -1,0 +1,52 @@
+{
+  "id": "baize",
+  "modelId": "baize",
+  "name": "白泽",
+  "species": "baize",
+  "url": "/resources/character/models/baize.glb",
+  "scale": 0.68,
+  "yOffset": 0,
+  "inPlace": true,
+  "defaultMode": "follow",
+  "animations": {
+    "idle": "CanineIdle",
+    "walk": "CanineWalk",
+    "runSlow": "CanineLocoTrot",
+    "runFast": "CanineGallop",
+    "attack": "CanineAttackLeft",
+    "hit": "CanineStand",
+    "death": "CanineDeath2",
+    "yardIdle": [
+      {
+        "clip": "CanineIdle",
+        "duration": 4.0
+      },
+      {
+        "clip": "CanineStand",
+        "duration": 2.5
+      },
+      {
+        "clip": "CanineAttackLeft",
+        "duration": 1.6
+      },
+      {
+        "clip": "CanineJumpRun",
+        "duration": 1.4
+      },
+      {
+        "clip": "CanineEating2",
+        "duration": 2.2
+      }
+    ],
+    "pet": [
+      {
+        "clip": "CanineJumpRun",
+        "duration": 1.0
+      },
+      {
+        "clip": "CanineIdle",
+        "duration": 1.2
+      }
+    ]
+  }
+}

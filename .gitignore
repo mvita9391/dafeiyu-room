@@ -67,6 +67,8 @@ downloads/
 /resources/character/notes/
 !/resources/character/models/Dafeiyu.glb
 !/resources/character/models/baize.glb
+!/resources/character/models/fish-bowl.glb
+!/resources/character/models/fish-bowl-anims.glb
 !resources/polyfork/glb/*.glb
 # User-supplied Unity packages and derived local content never ship.
 *.unitypackage

@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {BATTLE_INTRO_MS,createBaizeBattle,chooseBaizeOrder} from '../../shared/world/baize-battle.js';
+import {createBattlePet} from '../../shared/creatures/battle-projection.js';
 import {forestGrassAt} from '../../shared/world/forest.js';
 import {getTemplate} from '../../shared/world/templates.js';
 import {nearestFree} from '../../shared/world/navigation.js';
@@ -9,7 +10,10 @@ export function startBaizeEncounter({snapshot,emit,now},actor,enabled){
  const [x,,z]=actor.position;
  if(!enabled||actor.battle||actor.actionId||actor.grounded===false||actor.form==='swim'||
     scene?.templateId!=='forest_v1'||!forestGrassAt(x,z))throw Error('BATTLE_START_UNAVAILABLE');
- actor.battle={...createBaizeBattle(randomUUID(),now+BATTLE_INTRO_MS),introStartedAt:now};
+ const ownerPets=snapshot.pets?.owners?.[actor.actorId];
+ const petId=ownerPets?.roster?.battlePetId;
+ const battlePet=petId?createBattlePet(ownerPets?.instances?.[petId]):null;
+ actor.battle={...createBaizeBattle(randomUUID(),now+BATTLE_INTRO_MS,{pet:battlePet}),introStartedAt:now};
  actor.controller=null;
  actor.input=null;
  Object.assign(actor,{pose:'idle',moving:false,speed:0,sprint:false});

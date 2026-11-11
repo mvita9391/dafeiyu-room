@@ -108,3 +108,30 @@ test('移动朝向：W=镜头前方、D=右、A=左、S=转身向后', () => {
   const yaw = 1.1;
   assert.ok(near(thirdPersonMoveFacing(yaw, 1, 0), yaw - Math.PI / 2));
 });
+
+test('智能体（服务端）驱动移动：本地无输入时朝向跟随服务端 rotation', () => {
+  const state = createThirdPersonFacingState(0.3);
+  const out = resolve(state, { yaw: 1.0, moving: false, serverMoving: true, serverRotation: 2.2 });
+  assert.ok(near(out.rotation, 2.2), '朝向采用服务端 rotation，而不是保持旧朝向');
+  assert.ok(near(out.yaw, 1.0), '镜头 yaw 不被修改');
+  assert.ok(near(state.idleFacing, 2.2), '记住服务端朝向');
+});
+
+test('服务端驱动移动结束后：保持最后朝向，不转回移动前的旧朝向', () => {
+  const state = createThirdPersonFacingState(0.3);
+  resolve(state, { yaw: 1.0, serverMoving: true, serverRotation: 2.2 });
+  const out = resolve(state, { yaw: 1.0, serverMoving: false });
+  assert.ok(near(out.rotation, 2.2), '停下后保持朝向 2.2');
+});
+
+test('本地键盘移动优先：仍有 WASD 时按移动方向转，不被服务端朝向覆盖', () => {
+  const state = createThirdPersonFacingState(0.5);
+  const out = resolve(state, {
+    yaw: 1.0,
+    moving: true,
+    moveAngle: 0.5 - Math.PI / 2,
+    serverMoving: true,
+    serverRotation: 2.2,
+  });
+  assert.ok(near(out.rotation, 0.5 - Math.PI / 2), '本地移动方向优先');
+});

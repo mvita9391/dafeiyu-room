@@ -193,7 +193,9 @@
     #title h1{font-size:17px}
     #hud #status-stack{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right))}
     #status{width:190px;padding:12px 13px;border-radius:17px}
-    #actions{right:max(14px,env(safe-area-inset-right));gap:6px}
+    #actions{right:max(14px,env(safe-area-inset-right));gap:6px;flex-wrap:wrap;justify-content:flex-end;
+      max-width:calc(100vw - max(28px,env(safe-area-inset-left) + env(safe-area-inset-right)))}
+    #actions .btn,#actions .toolbar-action{padding:9px 10px;font-size:12px}
     .btn{padding:11px 13px;font-size:12px;gap:5px;min-height:42px}
     #hint{display:none}
   }

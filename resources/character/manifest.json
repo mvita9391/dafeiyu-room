@@ -11,6 +11,18 @@
       "sha256": "901868f1d0659ce63175862cd94a0c5739ad7f7dbdc93b7feb9e787e7cf0cd81",
       "bytes": 16692584,
       "runtime": true
+    },
+    {
+      "path": "resources/character/models/fish-bowl.glb",
+      "sha256": "299b81edd61360b2e9ad99f75c82c4b456ef52df3034b9f17a74609db55464bc",
+      "bytes": 22104008,
+      "runtime": true
+    },
+    {
+      "path": "resources/character/models/fish-bowl-anims.glb",
+      "sha256": "b7d2c0401d1208478c27991a6799a7cd6675783befcafe5e3cfe5c62e10964c2",
+      "bytes": 2819984,
+      "runtime": true
     }
   ]
 }

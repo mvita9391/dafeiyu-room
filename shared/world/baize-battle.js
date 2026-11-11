@@ -21,23 +21,26 @@ export function targetCells(slotId,move){
 }
 
 export function unitSkills(unit){
- return unit.speciesId?speciesSkills(unit.speciesId):Object.values(PET_SKILLS).filter(move=>move.effect);
+ return unit.skills?.length?unit.skills:(unit.speciesId?speciesSkills(unit.speciesId):Object.values(PET_SKILLS).filter(move=>move.effect));
 }
 
-function unit(id,name,slot,hp,speciesId){
- const fighter={id,name,slot,hp,maxHp:hp,speciesId};
+function unit(id,name,slot,hp,speciesId,extra={}){
+ const fighter={id,name,slot,hp,maxHp:hp,speciesId,attack:extra.attack??20,defense:extra.defense??0,...extra};
  fighter.uses=Object.fromEntries(unitSkills(fighter).filter(move=>move.uses!==null).map(move=>[move.id,move.uses]));
  return fighter;
 }
 
-export function createBaizeBattle(battleId,now=Date.now()){
+const FALLBACK_PET={name:'伙伴白泽',speciesId:'baize',modelId:'baize',level:1,maxHp:54,attack:20,defense:12,skills:speciesSkills('baize')};
+
+export function createBaizeBattle(battleId,now=Date.now(),{pet=null}={}){
+ const partner=pet??FALLBACK_PET;
  return {battleId,turn:1,readyAt:now,deadline:now+ROUND_MS,orders:{},outcome:null,lastTurn:null,units:{
-  hero:unit('hero','大肥鱼','ally-back-2',72),
-  pet:unit('pet','伙伴白泽','ally-front-2',54,'baize'),
-  wild:{...unit('wild','野生白泽','enemy-front-2',64,'baize'),uses:{},powerScale:.75},
-  'wild-west':{...unit('wild-west','林间白泽','enemy-front-1',28,'baize'),uses:{},powerScale:.45},
-  'wild-rear':{...unit('wild-rear','巡游白泽','enemy-back-2',30,'baize'),uses:{},powerScale:.45},
-  'wild-flank':{...unit('wild-flank','守林白泽','enemy-back-3',28,'baize'),uses:{},powerScale:.45},
+  hero:unit('hero','大肥鱼','ally-back-2',72,null,{skills:null}),
+  pet:unit('pet',partner.name,'ally-front-2',partner.maxHp,partner.speciesId,{attack:partner.attack,defense:partner.defense,skills:partner.skills,modelId:partner.modelId,level:partner.level}),
+  wild:{...unit('wild','野生白泽','enemy-front-2',64,'baize-wild'),uses:{},powerScale:.75},
+  'wild-west':{...unit('wild-west','林间白泽','enemy-front-1',28,'baize-wild'),uses:{},powerScale:.45},
+  'wild-rear':{...unit('wild-rear','巡游白泽','enemy-back-2',30,'baize-wild'),uses:{},powerScale:.45},
+  'wild-flank':{...unit('wild-flank','守林白泽','enemy-back-3',28,'baize-wild'),uses:{},powerScale:.45},
  }};
 }
 
@@ -79,7 +82,8 @@ export function resolveBaizeTurn(battle,now){
   const affected=new Set(targetCells(target.slot,move));
   const hits=[];
   for(const defender of targets.filter(candidate=>affected.has(candidate.slot))){
-   const amount=Math.min(defender.hp,Math.round(move.power*(unit.powerScale??1)));
+   const attackScale=(unit.attack??20)/20;
+   const amount=Math.min(defender.hp,Math.round(move.power*attackScale*(unit.powerScale??1)));
    defender.hp-=amount;
    hits.push({target:defender.id,amount,hp:defender.hp});
   }

@@ -9,7 +9,8 @@ export class LocalSound {
  mealChewIndex=0;
  footstepIndex=0;
  kickEffortIndex=0;
- constructor({AudioClass=globalThis.Audio}={}){this.AudioClass=AudioClass;this.enabled=false;this.actionAudio=new Map();this.voiceVersion=0;this.setMusic('home');}
+ constructor({AudioClass=globalThis.Audio}={}){this.AudioClass=AudioClass;this.enabled=false;this.actionAudio=new Map();this.voiceAudio=new Map();this.voiceVersion=0;this.setMusic('home');}
+ preloadVoice(kind){if(!this.voiceAudio.has(kind)){const audio=new this.AudioClass(`/resources/audio/${kind}.mp3`);audio.preload='auto';this.voiceAudio.set(kind,audio);}return this.voiceAudio.get(kind);}
  setMusic(theme){
   if(theme===this.musicTheme||!Object.hasOwn(MUSIC_THEMES,theme))return;
   this.music?.pause();
@@ -30,6 +31,7 @@ export class LocalSound {
    for(const id of Object.keys(FOODS))this.mealVoice(id);
    for(let i=1;i<=FOOTSTEP_COUNT;i++)this.actionClip(`footstep-${i}`);
    for(const cue of CHEW_CUES)for(let i=1;i<=MEAL_CHEW_COUNT;i++)this.actionClip(`${cue}-${i}`);
+   for(const kind of ['pool','pet','feed','sleep'])this.preloadVoice(kind);
   }else{
    this.voiceVersion++;
    this.musicDucked=false;
